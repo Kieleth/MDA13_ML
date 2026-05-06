@@ -1,0 +1,101 @@
+lead_id,company_name,industry,company_size,country,signup_date,source,demo_requested,emails_opened,response_time_hours,n_meetings,decision_maker_contacted,quoted_acv_eur,company_description,converted,converted_within_days,lead_segment_truth
+L0130,Faena Dynamics,logistics,465,IT,2025-08-21,conference,True,30,20.2,5,True,7828.38,"Corporación del sector logistics con presencia en varios países, ciclo de compra largo y comité formal.",True,5.0,strategic
+L0414,Cala Dynamics,retail,29,ES,2025-04-16,paid,False,3,55.1,0,False,3504.68,"Pyme de retail en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0548,Cardo Cloud,logistics,49,ES,2025-11-03,organic,True,7,2.1,4,True,3651.1,"pequeña jugador de logistics en ES, ciclo de compra corto.",False,,quick_mover
+L0185,Kéfir Hub,retail,87,ES,2024-01-19,referral,False,0,166.8,0,False,3542.28,"Empresa de retail de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0171,Hidra Cloud,logistics,10,ES,2024-08-22,referral,True,10,3.2,0,True,7596.54,"Pyme de logistics ágil, ya usa varias herramientas SaaS, presupuesto acotado.",False,,quick_mover
+L0760,Garbanzo Studio,fintech,140,ES,2025-12-26,organic,True,26,29.4,6,True,25527.09,"Empresa establecida en fintech, más de 140 empleados, requiere RFP y prueba piloto.",False,,strategic
+L0066,Hidra Labs,retail,600,ES,2025-10-29,outbound,True,18,28.8,10,True,14123.21,"Empresa establecida en retail, más de 600 empleados, requiere RFP y prueba piloto.",True,3.0,strategic
+L0072,Jaca Pro,retail,100,ES,2025-02-12,outbound,True,25,15.1,4,True,9798.62,"Corporación del sector retail con presencia en varios países, ciclo de compra largo y comité formal.",False,,strategic
+L0079,Bolero Labs,logistics,-1,ES,2025-07-18,conference,True,19,50.0,5,True,16300.12,"Empresa establecida en logistics, más de 564 empleados, requiere RFP y prueba piloto.",True,7.0,strategic
+L0356,Faro Studio,fintech,473,ES,2024-05-10,outbound,True,22,11.8,4,True,26588.59,"Empresa establecida en fintech, más de 473 empleados, requiere RFP y prueba piloto.",False,,strategic
+L0591,Setas Tech,healthcare,20,ES,2024-05-08,paid,False,3,100.5,1,False,5006.43,"Negocio de healthcare curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0121,Elixir Tech,healthcare,240,IT,2024-04-17,outbound,True,18,33.9,7,True,12728.71,"Líder de mercado en healthcare con sede en IT, integra herramientas a nivel grupo.",False,,strategic
+L99004,Jaca Systems,fintech,26,DE,2025-11-09,paid,True,6,1.9,1,True,,"Empresa de fintech pequeña en DE, equipo joven y decide rápido.",True,18.0,quick_mover
+L0175,Yedra Cloud,healthcare,26,Unknown,2025-09-16,referral,True,,1.5,1,True,4421.39,"pequeña jugador de healthcare en ES, ciclo de compra corto.",True,15.0,quick_mover
+L0087,Uva Hub,,89,ES,2024-04-27,outbound,True,4,150.8,0,False,5185.61,"Pyme de retail en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0294,Xilófono Tech,healthcare,58,DE,2025-07-18,outbound,True,5,1.8,1,True,6564.94,"Startup de healthcare con unos 58 empleados, busca cerrar trato en semanas.",False,,quick_mover
+L0786,Zarza Hub,logistics,648,IT,2025-03-23,outbound,True,33,,7,True,18974.79,"Corporación del sector logistics con presencia en varios países, ciclo de compra largo y comité formal.",False,,strategic
+L0423,Olivo Hub,logistics,12,PT,2024-07-29,outbound,False,4,2.5,3,True,4862.62,"Startup de logistics con unos 12 empleados, busca cerrar trato en semanas.",True,8.0,quick_mover
+L0311,Faena Labs,fintech,249,ES,2024-12-03,conference,False,27,21.1,3,True,18838.09,"Empresa establecida en fintech, más de 249 empleados, requiere RFP y prueba piloto.",False,,strategic
+L0614,Uva AI,fintech,50,,2025-07-31,organic,False,3,143.3,0,True,7718.57,"Empresa de fintech de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0050,Bolero Works,retail,20,DE,2025-12-29,referral,True,7,3.6,4,False,3262.78,"pequeña jugador de retail en DE, ciclo de compra corto.",True,25.0,quick_mover
+L0455,Faro Works,fintech,29,PT,2025-09-24,paid,True,12,1.5,3,True,5208.61,"Empresa de fintech pequeña en PT, equipo joven y decide rápido.",True,2.0,quick_mover
+L0162,Elixir Works,fintech,40,ES,2024-10-01,organic,False,3,47.9,0,False,4697.74,"Negocio de fintech curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0705,Olivo Cloud,SaaS,11,UK,2025-03-06,conference,True,6,2.8,2,True,3192.45,"pequeña jugador de SaaS en UK, ciclo de compra corto.",True,1.0,quick_mover
+L0499,Verbena Networks,logistics,1522,PT,2025-07-28,outbound,True,25,25.4,7,True,22555.85,"Empresa establecida en logistics, más de 1522 empleados, requiere RFP y prueba piloto.",True,20.0,strategic
+L0321,Pera Cloud,healthcare,46,DE,2025-05-05,organic,True,5,60.5,0,True,6187.14,Equipo de healthcare en DE pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0164,Bizum Systems,SaaS,9,ES,2024-08-25,paid,True,9,1.9,2,True,5343.39,"Pyme de SaaS ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,26.0,quick_mover
+L0606,Jaca AI,SaaS,220,ES,2024-03-26,paid,True,2,42.9,0,False,8670.1,"Empresa de SaaS de tamaño medio, descarga whitepapers pero no responde llamadas.",True,3.0,tire_kicker
+L0784,Ruta Hub,healthcare,241,ES,2025-04-15,organic,False,4,44.4,0,True,7531.78,Equipo de healthcare en ES pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0375,Jacaranda Studio  ,healthcare,17,PT,2024-08-23,organic,True,5,1.9,3,True,4994.23,"Empresa de healthcare pequeña en PT, equipo joven y decide rápido.",False,,quick_mover
+L0400,Acme Digital,fintech,162,,2025-02-10,outbound,True,18,13.4,4,False,23452.86,"Líder de mercado en fintech con sede en ES, integra herramientas a nivel grupo.",False,,strategic
+L0389,Quinoa Cloud,SaaS,21,ES,2025-10-10,paid,True,12,4.8,5,True,4854.9,"Empresa de SaaS pequeña en ES, equipo joven y decide rápido.",True,33.0,quick_mover
+L0232,Zarza Tech,logistics,191,ES,2025-01-16,paid,True,,27.7,8,True,13286.15,"Líder de mercado en logistics con sede en ES, integra herramientas a nivel grupo.",True,72.0,strategic
+L0580,Acme Works,fintech,999999,ES,2024-12-06,paid,False,5,4.1,3,True,4220.59,"pequeña jugador de fintech en ES, ciclo de compra corto.",False,,quick_mover
+L0203,Verbena Hub,logistics,382,ES,2024-12-09,conference,True,19,61.5,6,True,12289.4,"Multinacional de logistics con procesos maduros, decisión por comité de compras.",False,,strategic
+L0176,Bizum Solutions,healthcare,15,ES,2024-02-14,organic,True,11,1.4,2,False,4771.52,"Pyme de healthcare ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,12.0,quick_mover
+L0233,Setas Works,SaaS,42,FR,2025-06-02,organic,False,5,34.8,0,True,3903.84,"Negocio de SaaS curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0332,Elixir Pro (España),?,38,ES,2025-04-14,conference,True,9,2.3,3,True,5533.86,"Pyme de logistics ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,41.0,quick_mover
+L0241,Uva Studio,retail,280,IT,2025-04-28,organic,True,2,66.8,0,False,4264.74,Equipo de retail en IT pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0287,Quinoa Studio,retail,25,DE,2024-11-14,paid,True,8,2.6,2,True,3916.9,"Empresa de retail pequeña en DE, equipo joven y decide rápido.",True,21.0,quick_mover
+L0048,Bolero Cloud,logistics,8,ES,2025-05-13,referral,True,8,4.3,2,False,3036.95,"pequeña jugador de logistics en ES, ciclo de compra corto.",False,,quick_mover
+L0095,Ruta Cloud,fintech,8,ES,2025-05-14,referral,False,3,1.7,2,True,6550.71,"Empresa de fintech pequeña en ES, equipo joven y decide rápido.",False,,quick_mover
+L0138,Hada Labs,logistics,956,ES,2025-11-15,outbound,True,33,26.0,6,True,23742.02,"Enterprise logistics player, security review required before pilot.",True,36.0,strategic
+L0457,Bizum Networks,fintech,28,ES,2025-01-21,conference,False,3,113.5,0,False,5308.83,"Pyme de fintech en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0695,Cala Systems,fintech,46,ES,2025-05-26,referral,False,3,41.5,1,False,6591.37,"Empresa de fintech de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0476,Trébol Digital,SaaS,43,ES,2024-07-29,paid,True,11,3.3,3,False,4850.29,"Pyme de SaaS ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,9.0,quick_mover
+L0392,Cardo Hub,healthcare,9,FR,2025-12-31,paid,True,7,1.8,0,True,5377.71,"pequeña jugador de healthcare en FR, ciclo de compra corto.",True,,quick_mover
+L0390,Garbanzo Group,logistics,159,ES,2024-06-12,organic,False,1,80.3,1,False,3957.11,"Curious logistics buyer, no champion identified, slow to respond.",False,,tire_kicker
+L0064,Garbanzo Networks,healthcare,89,FR,2024-10-17,outbound,True,4,69.0,1,False,2852.59,"Empresa de healthcare de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0639,Kéfir Digital,healthcare,999999,IT,2024-10-22,organic,False,5,18.7,1,False,12349.96,"Empresa de healthcare de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0627,Trébol Tech,retail,108,ES,2025-09-09,paid,False,3,12.9,1,False,2589.0,"Negocio de retail curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0578,Elixir Cloud,N/A,1137,PT,2025-06-09,conference,True,17,26.0,7,False,18462.73,"Líder de mercado en logistics con sede en PT, integra herramientas a nivel grupo.",True,24.0,strategic
+L0146,Ibis Studio,logistics,15,ES,2025-04-24,organic,True,8,1.3,0,False,4123.46,"Pyme de logistics ágil, ya usa varias herramientas SaaS, presupuesto acotado.",False,,quick_mover
+L0592,Manzana Group,healthcare,436,PT,2025-05-13,conference,True,35,54.0,7,True,26015.65,"Empresa establecida en healthcare, más de 436 empleados, requiere RFP y prueba piloto.",True,19.0,strategic
+L0163,Manzana Dynamics,fintech,23,IT,2025-05-01,referral,True,12,2.2,3,True,5608.08,"Pyme de fintech ágil, ya usa varias herramientas SaaS, presupuesto acotado.",False,,quick_mover
+L0716,Elixir Cloud,logistics,57,PT,2025-09-10,paid,True,9,1.6,2,False,4181.56,"Startup de logistics con unos 57 empleados, busca cerrar trato en semanas.",True,1.0,quick_mover
+L0018,Hada Labs,?,41,PT,2025-05-07,organic,True,9,3.6,3,False,6909.97,"? startup, agile team, ready to commit Q3.",False,,quick_mover
+L0419,Verbena Systems,retail,73,FR,2024-07-01,outbound,yes,6,0.5,2,True,7046.0,"mediana jugador de retail en FR, ciclo de compra corto.",True,8.0,quick_mover
+L0015,Hidra Networks, retail ,74,ES,2024-10-22,outbound,True,23,30.6,10,True,8384.69,"Líder de mercado en retail con sede en ES, integra herramientas a nivel grupo.",False,,strategic
+L0280,Cala Cloud,logistics,26,ES,2025-05-08,outbound,False,0,111.4,1,False,5249.21,"Negocio de logistics curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0354,Dátil Hub,healthcare,793,ES,2024-02-17,organic,True,20,13.7,5,True,19752.89,"Líder de mercado en healthcare con sede en ES, integra herramientas a nivel grupo.",False,,strategic
+L0521,Bizum AI,logistics,194,UK,2024-12-16,organic,False,2,113.9,0,True,6039.49,"Empresa de logistics de tamaño medio, descarga whitepapers pero no responde llamadas.",False,,tire_kicker
+L0446,Acme Works,logistics,486,ES,2025-09-29,outbound,False,1,52.4,0,False,5765.82,"Negocio de logistics curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L99011,Elixir Works,SaaS,99999,ES,2025-02-21,outbound,N,8,2.4,4,False,6365.63,"Empresa de SaaS pequeña en ES, equipo joven y decide rápido.",False,,quick_mover
+L0458,Zarza Labs,healthcare,327,ES,2025-09-11,outbound,True,22,11.6,5,False,18743.51,"Multinacional de healthcare con procesos maduros, decisión por comité de compras.",True,6.0,strategic
+L0761,Faro Labs,logistics,175,ES,2024-11-11,organic,False,3,189.3,0,False,4936.43,"Negocio de logistics curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0181,Bizum Works,SaaS,123,ES,2024-01-23,organic,False,5,66.5,1,False,5598.29,"Negocio de SaaS curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0364,Pera Digital,healthcare,42,ES,2025-10-19,paid,True,7,1.4,4,True,7700.37,"Empresa de healthcare pequeña en ES, equipo joven y decide rápido.",True,12.0,quick_mover
+L0259,Hidra Labs,healthcare,16,IT,2025-12-15,paid,True,5,2.5,4,False,7402.8,"Startup de healthcare con unos 16 empleados, busca cerrar trato en semanas.",True,2.0,quick_mover
+L99010,Kéfir Cloud,SaaS,11,PT,2025-02-12,paid,False,10,1.7,5,True,2380.91,"Empresa de SaaS pequeña en PT, equipo joven y decide rápido.",False,,quick_mover
+L0158,Garbanzo Data,retail,18,FR,2025-10-21,organic,True,2,37.2,0,False,3627.1,"Pyme de retail en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0415,Manzana Systems,SaaS,25,ES,2024-11-25,organic,True,5,1.2,1,True,3861.7,"Small SaaS company in ES, fast decision cycle, looking to close in weeks.",False,,quick_mover
+L0377,Jaca Studio,fintech,171,Spain,2024-07-05,organic,False,2,45.0,1,True,12133.97,"Negocio de fintech curioso pero sin urgencia, comparando alternativas gratuitas.",True,8.0,tire_kicker
+L0063,Ibis Solutions,fintech,485,ES,2025-11-20,conference,True,24,27.2,3,True,,"Multinacional de fintech con procesos maduros, decisión por comité de compras.",False,,strategic
+L0134,Naranja Digital,retail,20,,2025-11-27,paid,True,2,1.4,3,False,4796.35,"pequeña jugador de retail en ES, ciclo de compra corto.",False,,quick_mover
+L0775,Verbena Studio,SaaS,16,es,2024-12-03,paid,True,9,2.5,5,False,3612.95,"Pyme de SaaS ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,62.0,quick_mover
+L0251,"Setas Studio, S.L.",logistics,49,ES,2024-03-08,organic,False,1,228.9,0,True,3304.99,Equipo de logistics en ES pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0464,Naranja Studio,healthcare,12,ES,2025-03-12,conference,True,9,2.5,3,True,,"Pyme de healthcare ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,2.0,quick_mover
+L0687,Gamba Works,healthcare,1441,IT,2025-09-03,outbound,yes,27,12.8,5,True,23035.13,"Empresa establecida en healthcare, más de 1441 empleados, requiere RFP y prueba piloto.",False,,strategic
+L99009,Ágora Group SL,healthcare,226,ESP,2025-11-25,conference,no,24,79.6,6,True,21938.9,"Multinacional de healthcare con procesos maduros, decisión por comité de compras.",False,,strategic
+L0385,Estuario Group,retail,404,PT,2025-11-12,conference,True,18,52.1,8,True,11272.71,"Enterprise retail player, security review required before pilot.",False,,strategic
+L0045,Iberia Digital,SaaS,109,ES,2025-06-17,outbound,False,5,29.4,0,False,7074.91,"Negocio de SaaS curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0022,Bizum Cloud,Unknown,290,ES,2025-08-12,organic,True,24,10.8,7,True,13637.77,(no notes),False,,strategic
+L0539,Elixir Data,logistics,33,FR,2025-11-12,paid,False,9,2.5,0,True,4698.29,"pequeña jugador de logistics en FR, ciclo de compra corto.",False,,quick_mover
+L0768,Manzana Networks,fintech,27,DE,2025-09-03,paid,True,9,2.6,1,False,10847.19,"pequeña jugador de fintech en DE, ciclo de compra corto.",False,,quick_mover
+L0119,Elixir Cloud,SaaS,164,UK,2024-02-08,conference,True,19,16.1,2,True,18424.91,"Líder de mercado en SaaS con sede en UK, integra herramientas a nivel grupo.",False,,strategic
+L0180,Garbanzo Data,logistics,78,FR,2024-10-16,organic,True,3,232.6,0,True,3759.15,"Pyme de logistics en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0289,Iberia Hub,fintech,379,FR,2025-08-27,organic,True,24,26.0,7,True,29379.75,"Corporación del sector fintech con presencia en varios países, ciclo de compra largo y comité formal.",False,,strategic
+L0128,Naranja Solutions,logistics,128,ES,2025-01-15,outbound,True,7,1.5,1,True,5610.24,"Pyme de logistics ágil, ya usa varias herramientas SaaS, presupuesto acotado.",True,4.0,quick_mover
+L0617,Elixir Systems,logistics,239,IT,2025-07-15,Conf.,False,1,88.6,0,False,9166.33,Equipo de logistics en IT pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0086,Cardo Solutions,healthcare,9,ES,2024-02-26,paid,True,11,4.1,3,True,5493.32,"Empresa de healthcare pequeña en ES, equipo joven y decide rápido.",True,6.0,quick_mover
+L0290,Gamba AI,SaaS,17,ES,2024-06-18,referral,True,11,2.1,1,True,4536.07,"pequeña jugador de SaaS en ES, ciclo de compra corto.",True,33.0,quick_mover
+L0402,Zarza Systems,logistics,239,ES,2024-05-29,paid,False,1,100.1,0,True,5598.6,"Pyme de logistics en fase exploratoria, sin presupuesto asignado todavía.",False,,tire_kicker
+L0620,Duna Hub,SaaS,20,DE,2024-01-09,organic,True,7,1.8,1,True,9315.27,"Startup de SaaS con unos 20 empleados, busca cerrar trato en semanas.",True,43.0,quick_mover
+L0304,Faena Cloud,fintech,1390,DE,2024-06-25,outbound,True,17,11.7,7,True,28198.16,"Established fintech corp in DE, formal RFP process, long sales cycle.",False,,strategic
+L0235,Gamba Studio,retail,29,ES,2025-05-06,referral,False,5,5000.0,0,False,3611.65,"Negocio de retail curioso pero sin urgencia, comparando alternativas gratuitas.",False,,tire_kicker
+L0007,Quinoa Cloud, fintech ,89,IT,2025-10-06,organic,False,4,152.0,0,True,4021.7,Equipo de fintech en IT pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0216,Jacaranda Digital,SaaS,211,PT,2025-06-05,paid,False,3,119.7,0,False,4645.61,Equipo de SaaS en PT pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
+L0187,Acme Dynamics,healthcare,512,ES,2024-10-16,outbound,True,28,18.5,10,True,38332.63,"Corporación del sector healthcare con presencia en varios países, ciclo de compra largo y comité formal.",True,20.0,strategic
+L0501,Zarza Networks,logistics,198,ES,2025-11-08,organic,False,2,,0,False,5380.64,Equipo de logistics en ES pidiendo info pero sin sponsor interno claro.,False,,tire_kicker
