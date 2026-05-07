@@ -1,0 +1,202 @@
+# ============================================================
+# paso_3.py — Cierra el dashboard con series temporales
+# ============================================================
+#
+# ── Reto ────────────────────────────────────────────────────
+#
+# Tienes el dashboard del paso_2 con 3 paneles (clasificación,
+# regresión, clustering). Falta el cuarto: series temporales.
+#
+# Vas a añadir:
+#   1. Una sección "Histórico mensual de conversiones" que
+#      muestra la serie histórica que aprendió el modelo.
+#   2. Un forecast para los próximos N meses, con N controlado
+#      por un slider.
+#
+# Esta es la parte INDEPENDIENTE de la sesión: prácticamente
+# todo es nuevo. Yo paso a echar un cable cuando me llames y
+# al final enseño cómo debería quedar.
+#
+# ── Huecos ──────────────────────────────────────────────────
+#
+# CINCO huecos marcados con `___`:
+#   - HUECO 1: cargar timeseries.pkl
+#   - HUECO 2: extraer la serie histórica del pkl
+#   - HUECO 3: extraer el modelo SARIMAX del pkl
+#   - HUECO 4: hacer get_forecast(steps=N) y obtener .predicted_mean
+#   - HUECO 5: dibujar la línea histórica + forecast en st.line_chart
+#
+# ── Cómo ejecutar ──────────────────────────────────────────
+#
+#   streamlit run session1/exercises/paso_3.py
+#
+# ============================================================
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import joblib
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+st.set_page_config(page_title="Cañadata — paso 3", page_icon="🎯", layout="wide")
+
+
+# ── Carga de todo ──────────────────────────────────────────
+
+@st.cache_data
+def load_data() -> pd.DataFrame:
+    return pd.read_csv(ROOT / "data" / "canadata_leads_clean.csv")
+
+
+@st.cache_resource
+def load_classifier() -> dict:
+    return joblib.load(ROOT / "session1" / "models" / "classifier.pkl")
+
+
+@st.cache_resource
+def load_regressor() -> dict:
+    return joblib.load(ROOT / "session1" / "models" / "regressor.pkl")
+
+
+@st.cache_resource
+def load_clusterer() -> dict:
+    return joblib.load(ROOT / "session1" / "models" / "clusterer.pkl")
+
+
+@st.cache_resource
+def load_timeseries() -> dict:
+    # ── HUECO 1 ────────────────────────────────────────────
+    # Carga ROOT / "session1" / "models" / "timeseries.pkl"
+    # con joblib.load(...).
+    # El pkl tiene dos cosas: 'model' (SARIMAX fit) y
+    # 'history' (serie pd.Series con la historia mensual).
+    # ──────────────────────────────────────────────────────
+    return ___
+
+
+# ── Helpers (igual que en paso_2) ──────────────────────────
+
+CLF_INPUT_COLS = [
+    "industry", "company_size", "country", "source", "demo_requested",
+    "emails_opened", "response_time_hours", "n_meetings",
+    "decision_maker_contacted", "quoted_acv_eur",
+]
+REG_INPUT_COLS = [c for c in CLF_INPUT_COLS if c != "quoted_acv_eur"]
+
+
+def build_X(lead: dict, columns: list[str], training_features: list[str]) -> pd.DataFrame:
+    df = pd.DataFrame([{k: lead[k] for k in columns}])
+    cat_cols = [c for c in ["industry", "country", "source"] if c in columns]
+    X = pd.get_dummies(df, columns=cat_cols)
+    for col in ["demo_requested", "decision_maker_contacted"]:
+        if col in X.columns:
+            X[col] = X[col].astype(int)
+    return X.reindex(columns=training_features, fill_value=0)
+
+
+# ── App ────────────────────────────────────────────────────
+
+df = load_data()
+classifier = load_classifier()
+regressor = load_regressor()
+clusterer = load_clusterer()
+ts = load_timeseries()
+
+st.title("🎯 Cañadata — paso 3: dashboard completo")
+st.caption(f"{len(df):,} leads · 4 modelos servidos · ML clásico end-to-end")
+
+with st.sidebar:
+    st.subheader("Lead")
+    lead_id = st.selectbox("lead_id", df["lead_id"].tolist())
+    st.divider()
+    st.subheader("Forecast")
+    forecast_months = st.slider("Meses a predecir", min_value=1, max_value=12, value=6)
+
+lead = df[df["lead_id"] == lead_id].iloc[0].to_dict()
+
+# ── Datos del lead ─────────────────────────────────────────
+st.subheader("Datos del lead")
+visible = ["company_name", "industry", "company_size", "country", "source",
+           "demo_requested", "emails_opened", "response_time_hours",
+           "n_meetings", "decision_maker_contacted", "quoted_acv_eur"]
+st.json({k: lead[k] for k in visible})
+
+# ── Tres paneles del paso_2 ────────────────────────────────
+col_clf, col_reg, col_clu = st.columns(3)
+
+with col_clf:
+    st.subheader("🎯 Clasificación")
+    X_clf = build_X(lead, CLF_INPUT_COLS, classifier["feature_names"])
+    proba = classifier["model"].predict_proba(X_clf)[0, 1]
+    st.metric("P(convertir)", f"{proba:.1%}")
+    st.caption(f"realidad: `{lead['converted']}`")
+
+with col_reg:
+    st.subheader("💰 Regresión (ACV)")
+    X_reg = build_X(lead, REG_INPUT_COLS, regressor["feature_names"])
+    acv_pred = np.exp(regressor["model"].predict(X_reg))[0]
+    st.metric("ACV predicho", f"{acv_pred:,.0f} €")
+    st.caption(f"cotizado real: `{lead['quoted_acv_eur']:,.0f} €`")
+
+with col_clu:
+    st.subheader("🔮 Clustering")
+    X_clu = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
+    X_scaled = clusterer["scaler"].transform(X_clu)
+    cluster_id = clusterer["model"].predict(X_scaled)[0]
+    st.metric("Cluster", f"#{cluster_id}")
+    st.caption(f"arquetipo plantado: `{lead['lead_segment_truth']}`")
+
+# ── Series temporales (NUEVO) ──────────────────────────────
+st.divider()
+st.subheader("📈 Histórico de conversiones + forecast")
+
+# ── HUECO 2 ────────────────────────────────────────────────
+# Saca la historia mensual del pkl. Es una pd.Series.
+#   ts["history"]  →  Serie con index mensual
+# ──────────────────────────────────────────────────────────
+history: pd.Series = ___
+
+# ── HUECO 3 ────────────────────────────────────────────────
+# Saca el modelo SARIMAX del pkl.
+#   ts["model"]  →  resultado de .fit() de SARIMAX
+# ──────────────────────────────────────────────────────────
+ts_model = ___
+
+# ── HUECO 4 ────────────────────────────────────────────────
+# Pídele al modelo el forecast de `forecast_months` pasos.
+#   forecast_obj = ts_model.get_forecast(steps=forecast_months)
+#   forecast = forecast_obj.predicted_mean   (es una pd.Series)
+# ──────────────────────────────────────────────────────────
+forecast: pd.Series = ___
+
+# ── HUECO 5 ────────────────────────────────────────────────
+# Combina historia y forecast en un solo DataFrame para
+# que st.line_chart lo dibuje bien (con dos columnas).
+#
+# Ejemplo:
+#   chart_df = pd.DataFrame({
+#       "histórico": history,
+#       "forecast":  forecast,
+#   })
+# ──────────────────────────────────────────────────────────
+chart_df = ___
+
+st.line_chart(chart_df, height=300)
+st.caption(
+    f"Historia: {len(history)} meses · "
+    f"Forecast: {forecast_months} meses · "
+    f"Total proyectado: {forecast.sum():.0f} conversiones"
+)
+
+st.divider()
+st.subheader("🚀 Si te quedas con ganas")
+st.markdown(
+    """
+- **Banda de confianza del forecast**: `forecast_obj.conf_int()` te da el intervalo. Píntalo como banda sombreada con plotly o matplotlib.
+- **Compara forecast vs histórico de los últimos meses**: ¿cuánto se desvía el modelo en los meses que ya conoce? Pista: `ts_model.fittedvalues`.
+- **Forecast por arquetipo**: separa la serie histórica por arquetipo y entrena tres SARIMAX. ¿La forma del forecast cambia mucho?
+- **Cambia la frecuencia**: prueba a resamplear a semanal en lugar de mensual y reentrena. ¿Mejora o empeora el AIC?
+"""
+)
