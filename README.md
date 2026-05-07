@@ -111,21 +111,29 @@ Cada ejercicio termina con una sección `🚀 Si te quedas con ganas` con retos 
 
 ---
 
-## El día 1 — `git pull` para recibir el material de la sesión
+## El día de cada sesión — cambiar de rama para recibir el material
 
-Este repo arranca solo con el **kit de pre-clase** (lo que necesitas para llegar listo). El material de cada sesión (los ejercicios, el código de referencia) se publica el día que toca.
+Este repo arranca solo con el **kit de pre-clase** en la rama `main` (lo que necesitas para llegar listo). El material de cada sesión vive en una rama distinta y se publica el día que toca:
 
-En los primeros 20 minutos del día 1, te pediremos que ejecutes:
+| Día | Rama | Contenido |
+|---|---|---|
+| Pre-clase (ahora) | `main` | Sólo el kit de pre-clase |
+| 12 mayo · S1 | `session-1` | Pre-clase + ejercicios S1 |
+| 13 mayo · S2 | `session-2` | Pre-clase + S1 + ejercicios S2 |
+| 14 mayo · S3 | `session-3` | Pre-clase + S1 + S2 + ejercicios S3 |
+
+En los primeros 20 minutos de cada sesión, te pediremos que cambies de rama:
 
 ```sh
-git pull
+git fetch
+git checkout session-1     # ó session-2 / session-3 según el día
 ```
 
-Y aparecerán las carpetas `session1/exercises/` con los ejercicios del día. Mismo flujo el 13 y el 14 de mayo.
+Y aparecerán las carpetas `session1/exercises/`, etc. con los ejercicios del día. Las ramas son **acumulativas**: cuando llegas a `session-3` tienes todo el contenido del taller.
 
-Si `git pull` te da problemas, las recetas de rescate están en [`ACTUALIZAR.md`](ACTUALIZAR.md).
+Si te da problemas (cambios locales sin guardar, conflictos), las recetas de rescate están en [`ACTUALIZAR.md`](ACTUALIZAR.md).
 
-> ¿Por qué así? Para que no te distraigas leyendo el material por adelantado. La narrativa del taller funciona mejor cuando descubres las cosas en clase.
+> ¿Por qué ramas y no `git pull`? Dos motivos: 1) que no veas el material de los siguientes días por adelantado — la narrativa funciona mejor descubriendo en clase. 2) que aprendas a usar `git checkout` y vivas las ramas como herramienta. Es uno de los conceptos clave de Git.
 
 ---
 
