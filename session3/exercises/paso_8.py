@@ -79,12 +79,14 @@ else:
         gates = flag.get("gates", {})
         rows = []
         for name, info in gates.items():
-            # Mismo formato que la sección dry-run de abajo: comparador como string.
-            symbol = "≥" if info["passed"] else "<"  # higher_is_better implicit aquí
+            # Leemos el comparador EXACTO que retrain.py escribió en el JSON,
+            # así esta tabla y la del dry-run de abajo dicen lo mismo.
+            # Fallback para JSONs antiguos (pre-comparator field):
+            comparador = info.get("comparator") or f"≥ {info['threshold']}"
             rows.append({
                 "métrica": name,
                 "valor": round(info["metric"], 3),
-                "comparador": f"{symbol} {info['threshold']}",
+                "comparador": comparador,
                 "ok": "✓" if info["passed"] else "✗",
             })
         if rows:

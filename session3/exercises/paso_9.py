@@ -101,7 +101,10 @@ if flag:
     cols[0].metric("Último deploy", flag["timestamp"])
     for i, (name, info) in enumerate(flag.get("gates", {}).items(), start=1):
         emoji = "✓" if info["passed"] else "✗"
-        cols[i].metric(name, f"{info['metric']:.3f}", f"{emoji} umbral {info['threshold']}")
+        # Usa el `comparator` del JSON (lower-is-better → "≤", higher-is-better → "≥").
+        # Fallback para JSONs antiguos sin ese campo:
+        comparador = info.get("comparator") or f"≥ {info['threshold']}"
+        cols[i].metric(name, f"{info['metric']:.3f}", f"{emoji} {comparador}")
 else:
     st.info("Aún no hay registro. Los modelos en producción son los del warm-up de pre-class.")
 

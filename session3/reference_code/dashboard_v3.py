@@ -371,8 +371,10 @@ with tab_ship:
         cols[0].metric("Último deploy", flag["timestamp"])
         for i, (name, info) in enumerate(flag.get("gates", {}).items(), start=1):
             emoji = "✓" if info["passed"] else "✗"
+            # Comparador exacto del JSON (lower-is-better → "≤", higher → "≥").
+            comparador = info.get("comparator") or f"≥ {info['threshold']}"
             cols[i].metric(name.replace("_", " "), f"{info['metric']:.3f}",
-                           f"{emoji} ≥ {info['threshold']}")
+                           f"{emoji} {comparador}")
     else:
         st.info("Sin retrain registrado. Modelos del warm-up.")
 

@@ -452,12 +452,25 @@ def main() -> int:
     print(f"  Modelos actualizados en {MODELS_DIR.relative_to(ROOT)}")
     print(f"  Backup de los previos en {(MODELS_DIR / '_prev').relative_to(ROOT)}")
 
-    # Deja una nota para que la app sepa que recargue
+    # Deja una nota para que la app sepa que recargue.
+    # Guardamos también `comparator` (la frase descriptiva ya construida en
+    # evaluate_gate) para que la UI no tenga que adivinar la dirección de la
+    # desigualdad por métrica. Sin esto, la tabla histórica de paso_8 / paso_9
+    # / dashboard_v3 muestra "≥ 200.0" para timeseries_mape (que es lower-is-
+    # better → el comparador correcto es "≤"), creando inconsistencia visual
+    # con la tabla del dry-run que parsea el stdout de este mismo script.
     flag = MODELS_DIR / "_retrained_at.json"
     flag.write_text(json.dumps({
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "gates": {g.name: {"metric": float(g.metric), "threshold": float(g.threshold),
-                           "passed": bool(g.passed)} for g in gates},
+        "gates": {
+            g.name: {
+                "metric": float(g.metric),
+                "threshold": float(g.threshold),
+                "passed": bool(g.passed),
+                "comparator": g.comparator,
+            }
+            for g in gates
+        },
         "rows_used": int(len(df)),
     }, indent=2))
     print(f"  Sello en {flag.relative_to(ROOT)}")
