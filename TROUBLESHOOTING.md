@@ -53,11 +53,19 @@ brew --version
 
 Síntoma: `setup_check.py` te dice "xgboost installed but cannot run (OpenMP runtime missing)". O el notebook de homework cae a RandomForest con un mensaje "libomp no disponible".
 
+Intento 1 — Homebrew:
+
 ```sh
 brew install libomp
 ```
 
-Si no quieres instalar Homebrew, **ignóralo**: el notebook tiene fallback automático a `RandomForestClassifier`. Pierdes un par de puntos de ROC-AUC. No bloquea el taller.
+Si funciona, perfecto.
+
+**Si en Apple Silicon (M1/M2/M3) el `brew install libomp` deja un Cellar vacío** o `brew --prefix libomp` apunta a una ruta que no contiene la librería: es un bug intermitente de algunas instalaciones de Homebrew con xgboost. **No te pelees con esto durante el taller**.
+
+**Salida fácil**: ignóralo. El notebook de homework tiene fallback automático a `RandomForestClassifier`. La diferencia es ~2 puntos de ROC-AUC (xgb ~0.86 vs RF ~0.84). Para el taller es indistinguible — todos los gates pasan, todas las comparaciones funcionan, la narrativa LLM-vs-clásico no cambia.
+
+Si quieres arreglarlo después de la clase: prueba `brew reinstall libomp`, o instala xgboost con conda (`conda install -c conda-forge xgboost` en lugar de pip), o usa Linux/WSL.
 
 ### conda command not found después de instalar
 
