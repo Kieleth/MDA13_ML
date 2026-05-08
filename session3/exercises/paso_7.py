@@ -180,16 +180,68 @@ if st.button("Correr el harness", type="primary"):
     auc_clf = ___
     auc_llm = ___
 
+    # ── Bootstrap CI (humildad estadística) ─────────────────
+    #
+    # Con sólo 20-100 leads, la diferencia entre AUC=0.85 y AUC=0.78
+    # podría ser ruido. Bootstrap te da el intervalo de confianza al 95%.
+    # Si los CI se solapan, NO puedes decir que un modelo es mejor que el otro.
+    #
+    # 1000 remuestreos con reemplazo. ~0.5s extra. Te ahorra discusiones.
+    def bootstrap_auc_ci(y, p, n_boot=1000, seed=0):
+        rng = np.random.default_rng(seed)
+        m = len(y)
+        aucs = []
+        for _ in range(n_boot):
+            idx = rng.choice(m, size=m, replace=True)
+            if len(set(y[idx])) > 1:
+                aucs.append(roc_auc_score(y[idx], p[idx]))
+        a = np.array(aucs)
+        return np.percentile(a, 2.5), np.percentile(a, 97.5)
+
+    if not np.isnan(auc_clf):
+        clf_lo, clf_hi = bootstrap_auc_ci(y_true, proba_clf)
+        llm_lo, llm_hi = bootstrap_auc_ci(y_true, proba_llm)
+    else:
+        clf_lo = clf_hi = llm_lo = llm_hi = float("nan")
+
     # Costes (tarifas a fecha de hoy: gpt-4.1-mini ≈ 0.40€ / 1M input, 1.60€ / 1M output)
     cost = (total_in_tok * 0.40 + total_out_tok * 1.60) / 1_000_000
     cost_per_lead = cost / n
 
     st.subheader("Resultados agregados")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("ROC-AUC clasificador", f"{auc_clf:.3f}" if not np.isnan(auc_clf) else "n/d")
-    c2.metric("ROC-AUC LLM zero-shot", f"{auc_llm:.3f}" if not np.isnan(auc_llm) else "n/d")
+    c1.metric(
+        "ROC-AUC clasificador",
+        f"{auc_clf:.3f}" if not np.isnan(auc_clf) else "n/d",
+        help=f"95% CI: [{clf_lo:.3f}, {clf_hi:.3f}]" if not np.isnan(clf_lo) else None,
+    )
+    c2.metric(
+        "ROC-AUC LLM zero-shot",
+        f"{auc_llm:.3f}" if not np.isnan(auc_llm) else "n/d",
+        help=f"95% CI: [{llm_lo:.3f}, {llm_hi:.3f}]" if not np.isnan(llm_lo) else None,
+    )
     c3.metric("Coste LLM total", f"{cost*100:.3f} cent")
     c4.metric("Latencia LLM media", f"{t_llm/n:.2f} s/lead")
+
+    # Humildad estadística explícita
+    if not np.isnan(clf_lo):
+        ci_overlap = max(clf_lo, llm_lo) <= min(clf_hi, llm_hi)
+        st.markdown(
+            f"**Intervalos de confianza al 95%** (bootstrap, 1000 remuestreos):\n"
+            f"- Clasificador: [{clf_lo:.3f}, {clf_hi:.3f}]\n"
+            f"- LLM zero-shot: [{llm_lo:.3f}, {llm_hi:.3f}]"
+        )
+        if ci_overlap:
+            st.warning(
+                "⚠ Los CIs se SOLAPAN. Con este tamaño de muestra NO puedes "
+                "afirmar que un modelo sea mejor que el otro. Necesitas más "
+                "datos (sube el slider) o aceptar que la diferencia podría ser ruido."
+            )
+        else:
+            st.success(
+                "Los CIs NO se solapan: la diferencia es estadísticamente significativa "
+                "a este tamaño de muestra."
+            )
 
     st.caption(
         f"Clasificador: {t_clf*1000:.1f} ms para los {n} leads (vectorizado). "

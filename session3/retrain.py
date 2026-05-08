@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import shutil
 import sys
 import time
@@ -50,6 +51,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
+logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
+logging.getLogger("prophet").setLevel(logging.WARNING)
 
 def _find_project_root() -> Path:
     """Walk up from this file until we find a directory with data/canadata_leads.csv.
@@ -85,22 +88,58 @@ try:
 except Exception:
     pass
 
-# ── Quality gates: umbrales mínimos para aceptar el reentrenamiento ─────────
+# ── Quality gates ───────────────────────────────────────────────────────────
 #
-# Estos números salen de lo que ya consigue el modelo entrenado en pre_class
-# sobre datos limpios. Si el reentreno baja por debajo de estos, NO desplegamos.
-# Los puedes endurecer (más restrictivo) o relajar según el caso.
+# Política: NO degradar respecto al modelo en producción.
+#
+#   - Si existe un deploy previo (`session1/models/_retrained_at.json`),
+#     el gate exige que la métrica nueva no caiga más de un 5% respecto
+#     a la del modelo anterior. Esto es lo que querrías en producción real:
+#     "no desplegamos algo peor que lo que ya hay".
+#
+#   - Si NO hay deploy previo (primer arranque), usamos los `BASELINES`
+#     de aquí abajo como umbrales de seguridad mínima — evitamos publicar
+#     modelos rotos en frío.
+#
+# `higher_is_better` indica si la métrica es del tipo "más alto mejor"
+# (AUC, R², ARI) o "más bajo mejor" (MAPE).
 
-GATES = {
-    "classifier_roc_auc": 0.78,
-    "regressor_r2_log":   0.65,
-    "clusterer_ari":      0.40,
-    # AIC más bajo es mejor; rechazamos por encima. Ojo: AIC depende del
-    # número de observaciones en la serie temporal, no de la calidad por fila.
-    # 150 es razonable para 24-30 meses de datos. En producción real querrías
-    # comparar AIC vs el del modelo anterior, no un absoluto.
-    "timeseries_aic_max": 150.0,
+@dataclass
+class GateSpec:
+    name: str
+    higher_is_better: bool
+    baseline: float          # umbral mínimo absoluto (para el primer deploy)
+    tolerance: float = 0.05  # cuánta degradación toleramos vs deploy anterior
+
+
+GATE_SPECS = {
+    "classifier_roc_auc": GateSpec("classifier_roc_auc", higher_is_better=True, baseline=0.78),
+    "regressor_r2_log":   GateSpec("regressor_r2_log",   higher_is_better=True, baseline=0.65),
+    "clusterer_ari":      GateSpec("clusterer_ari",      higher_is_better=True, baseline=0.40),
+    "timeseries_mape":    GateSpec("timeseries_mape",    higher_is_better=False, baseline=200.0),
 }
+
+
+def evaluate_gate(spec: GateSpec, metric: float, previous: float | None) -> "GateResult":
+    """Política relativa al previo, con fallback al baseline absoluto."""
+    if previous is not None:
+        if spec.higher_is_better:
+            threshold = previous * (1 - spec.tolerance)
+            passed = metric >= threshold
+            comparator = f"≥ {threshold:.3f} (95% del previo {previous:.3f})"
+        else:
+            threshold = previous * (1 + spec.tolerance)
+            passed = metric <= threshold
+            comparator = f"≤ {threshold:.3f} (105% del previo {previous:.3f})"
+    else:
+        threshold = spec.baseline
+        if spec.higher_is_better:
+            passed = metric >= threshold
+            comparator = f"≥ {threshold} (umbral inicial · sin previo)"
+        else:
+            passed = metric <= threshold
+            comparator = f"≤ {threshold} (umbral inicial · sin previo)"
+    return GateResult(spec.name, metric, threshold, passed, comparator)
 
 
 # ── Limpieza (idéntica al notebook pre_class/1_classical_models) ────────────
@@ -154,7 +193,9 @@ def clean_canadata(df: pd.DataFrame) -> pd.DataFrame:
     df = df[df["quoted_acv_eur"].isna() | ((df["quoted_acv_eur"] >= 100) & (df["quoted_acv_eur"] <= 500_000))]
 
     df["signup_date"] = pd.to_datetime(df["signup_date"].astype(str), errors="coerce", format="mixed")
-    df = df[df["signup_date"].notna() & (df["signup_date"] <= pd.Timestamp("2027-12-31"))]
+    # Acepta hasta fin de 2026 (deja pasar lotes nuevos de los próximos meses,
+    # filtra los errores de fechas futuras 2027+ que están plantados a propósito)
+    df = df[df["signup_date"].notna() & (df["signup_date"] <= pd.Timestamp("2026-12-31"))]
 
     df["emails_opened"] = df["emails_opened"].fillna(df["emails_opened"].median())
     df["response_time_hours"] = df["response_time_hours"].fillna(df["response_time_hours"].median())
@@ -189,13 +230,24 @@ class GateResult:
     metric: float
     threshold: float
     passed: bool
+    comparator: str = ""
 
     def __str__(self) -> str:
         flag = "✓" if self.passed else "✗"
-        return f"  {flag} {self.name}: {self.metric:.3f} (umbral {self.threshold})"
+        comp = self.comparator or f"umbral {self.threshold}"
+        return f"  {flag} {self.name}: {self.metric:.3f} ({comp})"
 
 
-def train_classifier(df: pd.DataFrame) -> tuple[dict, GateResult]:
+def _previous_metric(name: str, prev_flag: dict | None) -> float | None:
+    if not prev_flag:
+        return None
+    g = prev_flag.get("gates", {}).get(name)
+    if not g:
+        return None
+    return float(g.get("metric"))
+
+
+def train_classifier(df: pd.DataFrame, prev_flag: dict | None) -> tuple[dict, GateResult]:
     X = build_features(df, drop=[TARGET_CLF])
     y = df[TARGET_CLF].astype(int)
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
@@ -207,50 +259,67 @@ def train_classifier(df: pd.DataFrame) -> tuple[dict, GateResult]:
         model = RandomForestClassifier(n_estimators=300, max_depth=10, random_state=42, n_jobs=-1)
         kind = "random_forest"
     model.fit(Xtr, ytr)
-    auc = roc_auc_score(yte, model.predict_proba(Xte)[:, 1])
+    auc = float(roc_auc_score(yte, model.predict_proba(Xte)[:, 1]))
     artifact = {"model": model, "feature_names": list(X.columns), "kind": kind}
-    return artifact, GateResult("classifier_roc_auc", auc, GATES["classifier_roc_auc"],
-                                auc >= GATES["classifier_roc_auc"])
+    return artifact, evaluate_gate(
+        GATE_SPECS["classifier_roc_auc"], auc,
+        _previous_metric("classifier_roc_auc", prev_flag),
+    )
 
 
-def train_regressor(df: pd.DataFrame) -> tuple[dict, GateResult]:
+def train_regressor(df: pd.DataFrame, prev_flag: dict | None) -> tuple[dict, GateResult]:
     X = build_features(df, drop=[TARGET_CLF, TARGET_REG])
     y = np.log(df[TARGET_REG].values)
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.2, random_state=42)
     model = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42, n_jobs=-1)
     model.fit(Xtr, ytr)
-    r2 = r2_score(yte, model.predict(Xte))
+    r2 = float(r2_score(yte, model.predict(Xte)))
     artifact = {"model": model, "feature_names": list(X.columns), "log_target": True}
-    return artifact, GateResult("regressor_r2_log", r2, GATES["regressor_r2_log"],
-                                r2 >= GATES["regressor_r2_log"])
+    return artifact, evaluate_gate(
+        GATE_SPECS["regressor_r2_log"], r2,
+        _previous_metric("regressor_r2_log", prev_flag),
+    )
 
 
-def train_clusterer(df: pd.DataFrame) -> tuple[dict, GateResult]:
+def train_clusterer(df: pd.DataFrame, prev_flag: dict | None) -> tuple[dict, GateResult]:
     X = build_features(df, drop=[TARGET_CLF, TARGET_REG])
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
     model = KMeans(n_clusters=3, random_state=42, n_init=10)
     labels = model.fit_predict(Xs)
-    ari = adjusted_rand_score(df["lead_segment_truth"], labels)
+    ari = float(adjusted_rand_score(df["lead_segment_truth"], labels))
     artifact = {"model": model, "scaler": scaler, "feature_names": list(X.columns)}
-    return artifact, GateResult("clusterer_ari", ari, GATES["clusterer_ari"],
-                                ari >= GATES["clusterer_ari"])
+    return artifact, evaluate_gate(
+        GATE_SPECS["clusterer_ari"], ari,
+        _previous_metric("clusterer_ari", prev_flag),
+    )
 
 
-def train_timeseries(df: pd.DataFrame) -> tuple[dict, GateResult]:
-    from statsmodels.tsa.statespace.sarimax import SARIMAX
+def train_timeseries(df: pd.DataFrame, prev_flag: dict | None) -> tuple[dict, GateResult]:
+    from prophet import Prophet
     monthly = df[df["converted"]].set_index("signup_date").resample("MS").size()
     monthly = monthly.reindex(
         pd.date_range(monthly.index.min(), monthly.index.max(), freq="MS"),
         fill_value=0,
     )
-    model = SARIMAX(monthly, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12),
-                    enforce_stationarity=False, enforce_invertibility=False)
-    fit = model.fit(disp=False)
-    aic = float(fit.aic)
-    artifact = {"model": fit, "history": monthly}
-    return artifact, GateResult("timeseries_aic_max", aic, GATES["timeseries_aic_max"],
-                                aic <= GATES["timeseries_aic_max"])
+    prophet_df = monthly.reset_index()
+    prophet_df.columns = ["ds", "y"]
+    train, test = prophet_df.iloc[:-3], prophet_df.iloc[-3:]
+
+    eval_model = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
+    eval_model.fit(train)
+    pred = eval_model.predict(test[["ds"]])
+    denom = np.maximum(1, test["y"].values)
+    mape = float(np.mean(np.abs(test["y"].values - pred["yhat"].values) / denom) * 100)
+
+    full_model = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
+    full_model.fit(prophet_df)
+
+    artifact = {"model": full_model, "history": monthly, "validation_mape": mape}
+    return artifact, evaluate_gate(
+        GATE_SPECS["timeseries_mape"], mape,
+        _previous_metric("timeseries_mape", prev_flag),
+    )
 
 
 # ── Atomic swap ─────────────────────────────────────────────────────────────
@@ -309,12 +378,24 @@ def main() -> int:
     df = clean_canadata(df_combined)
     print(f"{len(df)} filas tras clean_canadata")
 
+    # Lee el sello del deploy anterior (si existe) para gates relativos
+    prev_flag_path = MODELS_DIR / "_retrained_at.json"
+    prev_flag = None
+    if prev_flag_path.exists():
+        try:
+            prev_flag = json.loads(prev_flag_path.read_text())
+            print(f"→ Deploy previo: {prev_flag.get('timestamp')}  → gates relativos a este")
+        except Exception:
+            print("→ Deploy previo presente pero el JSON no parsea — uso baselines absolutos")
+    else:
+        print("→ Sin deploy previo → uso baselines absolutos")
+
     print("\n→ Reentrenando los 4 modelos…")
     t0 = time.time()
-    classifier, g_clf = train_classifier(df)
-    regressor, g_reg = train_regressor(df)
-    clusterer, g_clu = train_clusterer(df)
-    timeseries, g_ts = train_timeseries(df)
+    classifier, g_clf = train_classifier(df, prev_flag)
+    regressor, g_reg = train_regressor(df, prev_flag)
+    clusterer, g_clu = train_clusterer(df, prev_flag)
+    timeseries, g_ts = train_timeseries(df, prev_flag)
     print(f"  hecho en {time.time() - t0:.1f}s\n")
 
     print("→ Quality gates:")

@@ -241,9 +241,13 @@ with tab_pred:
     st.divider()
     st.subheader("📈 Histórico + forecast")
     history = timeseries["history"]
-    fc = timeseries["model"].get_forecast(steps=6)
-    chart_df = pd.DataFrame({"histórico": history, "forecast": fc.predicted_mean})
+    ts_m = timeseries["model"]   # Prophet
+    future = ts_m.make_future_dataframe(periods=6, freq="MS")
+    fc = ts_m.predict(future)
+    forecast = fc.set_index("ds")["yhat"].iloc[-6:]
+    chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
     st.line_chart(chart_df, height=260)
+    st.caption(f"MAPE en hold-out: {timeseries.get('validation_mape', 0):.1f}%")
 
 
 # ──────────────────────────────────────────────────────────
@@ -294,11 +298,46 @@ with tab_harness:
         auc_clf = roc_auc_score(y_true, proba_clf) if len(set(y_true)) > 1 else float("nan")
         auc_llm = roc_auc_score(y_true, proba_llm) if len(set(y_true)) > 1 else float("nan")
 
+        # Bootstrap CI — humildad estadística con muestras pequeñas
+        def _boot_ci(y, p, n_boot=1000, seed=0):
+            rng = np.random.default_rng(seed)
+            m = len(y)
+            aucs = []
+            for _ in range(n_boot):
+                idx = rng.choice(m, size=m, replace=True)
+                if len(set(y[idx])) > 1:
+                    aucs.append(roc_auc_score(y[idx], p[idx]))
+            a = np.array(aucs)
+            return np.percentile(a, 2.5), np.percentile(a, 97.5)
+
+        if not np.isnan(auc_clf):
+            clf_lo, clf_hi = _boot_ci(y_true, proba_clf)
+            llm_lo, llm_hi = _boot_ci(y_true, proba_llm)
+        else:
+            clf_lo = clf_hi = llm_lo = llm_hi = float("nan")
+
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("AUC clasificador", f"{auc_clf:.3f}")
-        c2.metric("AUC LLM zero-shot", f"{auc_llm:.3f}")
+        c1.metric(
+            "AUC clasificador",
+            f"{auc_clf:.3f}",
+            help=f"95% CI: [{clf_lo:.3f}, {clf_hi:.3f}]",
+        )
+        c2.metric(
+            "AUC LLM zero-shot",
+            f"{auc_llm:.3f}",
+            help=f"95% CI: [{llm_lo:.3f}, {llm_hi:.3f}]",
+        )
         c3.metric("Latencia clf", f"{t_clf*1000:.0f} ms")
         c4.metric("Latencia LLM", f"{t_llm/n:.2f} s/lead")
+
+        if not np.isnan(clf_lo):
+            ci_overlap = max(clf_lo, llm_lo) <= min(clf_hi, llm_hi)
+            if ci_overlap:
+                st.warning(
+                    f"⚠ Los CIs se solapan ({clf_lo:.3f}-{clf_hi:.3f} vs "
+                    f"{llm_lo:.3f}-{llm_hi:.3f}). Con {n} leads no puedes "
+                    "afirmar que uno sea mejor. Sube el slider o acepta el ruido."
+                )
 
         st.bar_chart(pd.DataFrame(
             {"clasificador": [auc_clf], "LLM": [auc_llm]}, index=["ROC-AUC"]
