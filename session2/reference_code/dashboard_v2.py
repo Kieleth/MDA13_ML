@@ -292,10 +292,22 @@ ts_m = timeseries["model"]   # Prophet
 future = ts_m.make_future_dataframe(periods=forecast_months, freq="MS")
 fc = ts_m.predict(future)
 forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
-chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
-if len(history) > 0 and len(forecast) > 0:
-    chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
-st.line_chart(chart_df, height=280)
+yhat_lower = fc.set_index("ds")["yhat_lower"].iloc[-forecast_months:]
+yhat_upper = fc.set_index("ds")["yhat_upper"].iloc[-forecast_months:]
+
+import plotly.graph_objects as go
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=history.index, y=history.values, name="histórico", line=dict(color="steelblue")))
+fig.add_trace(go.Scatter(x=forecast.index, y=forecast.values, name="forecast", line=dict(color="darkorange")))
+fig.add_trace(go.Scatter(
+    x=list(forecast.index) + list(forecast.index[::-1]),
+    y=list(yhat_upper) + list(yhat_lower[::-1]),
+    fill="toself", fillcolor="rgba(255,165,0,0.15)",
+    line=dict(color="rgba(0,0,0,0)"),
+    name="banda 80%",
+))
+fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0))
+st.plotly_chart(fig, use_container_width=True)
 
 # Chat con modo seleccionable
 st.divider()
