@@ -288,8 +288,11 @@ cd.metric("Arquetipo", lead["lead_segment_truth"])
 st.divider()
 st.subheader("📈 Histórico + forecast (S1)")
 history = timeseries["history"]
-fc = timeseries["model"].get_forecast(steps=forecast_months)
-chart_df = pd.DataFrame({"histórico": history, "forecast": fc.predicted_mean})
+ts_m = timeseries["model"]   # Prophet
+future = ts_m.make_future_dataframe(periods=forecast_months, freq="MS")
+fc = ts_m.predict(future)
+forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
+chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
 st.line_chart(chart_df, height=280)
 
 # Chat con modo seleccionable
