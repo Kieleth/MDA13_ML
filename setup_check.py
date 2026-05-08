@@ -172,6 +172,7 @@ def check_imports() -> None:
         ("numpy", "pip install numpy"),
         ("sklearn", "pip install scikit-learn"),
         ("statsmodels", "pip install statsmodels"),
+        ("prophet", "pip install prophet"),
         ("openai", "pip install openai"),
         ("dotenv", "pip install python-dotenv"),
         ("joblib", "pip install joblib"),

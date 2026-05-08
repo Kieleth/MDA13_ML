@@ -160,11 +160,12 @@ st.divider()
 st.subheader("📈 Histórico de conversiones + forecast")
 
 history: pd.Series = ts["history"]
-ts_model = ts["model"]
+ts_model = ts["model"]   # Prophet
 
-forecast_obj = ts_model.get_forecast(steps=forecast_months)
-forecast: pd.Series = forecast_obj.predicted_mean
-ci = forecast_obj.conf_int()
+future = ts_model.make_future_dataframe(periods=forecast_months, freq="MS")
+fc = ts_model.predict(future)
+forecast: pd.Series = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
+ci_df = fc.set_index("ds")[["yhat_lower", "yhat_upper"]].iloc[-forecast_months:]
 
 chart_df = pd.DataFrame({
     "histórico": history,
@@ -175,7 +176,7 @@ st.line_chart(chart_df, height=320)
 col_a, col_b, col_c = st.columns(3)
 col_a.metric("Historia (meses)", f"{len(history)}")
 col_b.metric(f"Forecast ({forecast_months}m)", f"{forecast.sum():.0f} conversiones")
-col_c.metric("AIC del modelo", f"{ts_model.aic:.1f}")
+col_c.metric("MAPE hold-out", f"{ts.get('validation_mape', 0):.1f}%")
 
-with st.expander("Ver intervalo de confianza"):
-    st.dataframe(ci.round(1))
+with st.expander("Ver intervalo de confianza (Prophet yhat_lower / yhat_upper)"):
+    st.dataframe(ci_df.round(1))
