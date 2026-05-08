@@ -19,7 +19,7 @@ Plantilla para tu cierre del taller. Rellénala antes de la ronda final. No tien
 
 **Approach que enviaría a producción**:
 
-- [ ] Modelo clásico (sklearn/xgboost/SARIMAX) entrenado con nuestro dataset
+- [ ] Modelo clásico (sklearn/xgboost/Prophet) entrenado con nuestro dataset
 - [ ] LLM zero-shot directo
 - [ ] LLM como analista (text-to-code sobre los datos)
 - [ ] LLM operando el modelo entrenado (lo mejor de los dos)

@@ -50,9 +50,34 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+import contextlib
+import os
+
 warnings.filterwarnings("ignore")
-logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
-logging.getLogger("prophet").setLevel(logging.WARNING)
+for _name in ("cmdstanpy", "prophet", "prophet.forecaster"):
+    _lg = logging.getLogger(_name)
+    _lg.setLevel(logging.ERROR)
+    _lg.handlers = []
+    _lg.propagate = False
+
+
+@contextlib.contextmanager
+def silenced_stderr_stdout():
+    """Suprime stdout/stderr a nivel de descriptor (atrapa también el ruido
+    de C/C++ que sale del backend Stan de Prophet, que no pasa por logging
+    de Python)."""
+    devnull = os.open(os.devnull, os.O_RDWR)
+    saved_out, saved_err = os.dup(1), os.dup(2)
+    try:
+        os.dup2(devnull, 1)
+        os.dup2(devnull, 2)
+        yield
+    finally:
+        os.dup2(saved_out, 1)
+        os.dup2(saved_err, 2)
+        os.close(devnull)
+        os.close(saved_out)
+        os.close(saved_err)
 
 def _find_project_root() -> Path:
     """Walk up from this file until we find a directory with data/canadata_leads.csv.
@@ -307,13 +332,15 @@ def train_timeseries(df: pd.DataFrame, prev_flag: dict | None) -> tuple[dict, Ga
     train, test = prophet_df.iloc[:-3], prophet_df.iloc[-3:]
 
     eval_model = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
-    eval_model.fit(train)
+    with silenced_stderr_stdout():
+        eval_model.fit(train)
     pred = eval_model.predict(test[["ds"]])
     denom = np.maximum(1, test["y"].values)
     mape = float(np.mean(np.abs(test["y"].values - pred["yhat"].values) / denom) * 100)
 
     full_model = Prophet(yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False)
-    full_model.fit(prophet_df)
+    with silenced_stderr_stdout():
+        full_model.fit(prophet_df)
 
     artifact = {"model": full_model, "history": monthly, "validation_mape": mape}
     return artifact, evaluate_gate(

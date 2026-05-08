@@ -132,11 +132,15 @@ def llm_score_lead(_client, lead_id: str, description: str) -> int:
 
 
 def parse_gates(stdout: str) -> list[dict]:
-    pattern = re.compile(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\(umbral\s+([\d.]+)")
+    """Las líneas tienen forma:
+        ✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))
+        ✗ timeseries_mape: 370.32 (≤ 200.0 (umbral inicial · sin previo))
+    El comparador tiene paréntesis anidados; lo capturamos como string."""
+    pattern = re.compile(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\((.+)\)\s*$", re.MULTILINE)
     return [
-        {"métrica": name, "valor": round(float(val), 3), "umbral": float(thr),
+        {"métrica": name, "valor": round(float(val), 3), "comparador": comparator,
          "ok": "✓" if flag == "✓" else "✗"}
-        for flag, name, val, thr in pattern.findall(stdout)
+        for flag, name, val, comparator in pattern.findall(stdout)
     ]
 
 
@@ -246,6 +250,8 @@ with tab_pred:
     fc = ts_m.predict(future)
     forecast = fc.set_index("ds")["yhat"].iloc[-6:]
     chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
+    if len(history) > 0 and len(forecast) > 0:
+        chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
     st.line_chart(chart_df, height=260)
     st.caption(f"MAPE en hold-out: {timeseries.get('validation_mape', 0):.1f}%")
 

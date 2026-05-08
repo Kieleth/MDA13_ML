@@ -68,11 +68,18 @@ def load_flag() -> dict | None:
 
 
 def parse_gates(stdout: str) -> list[dict]:
-    pattern = re.compile(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\(umbral\s+([\d.]+)")
+    """Parse the gate lines that retrain.py prints, in the form:
+        ✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))
+        ✗ timeseries_mape: 370.32 (≤ 200.0 (umbral inicial · sin previo))
+
+    El comparador entre paréntesis tiene paréntesis anidados, así que no
+    parseamos un float al final; capturamos el comparador como string.
+    """
+    pattern = re.compile(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\((.+)\)\s*$", re.MULTILINE)
     return [
-        {"métrica": name, "valor": float(val), "umbral": float(thr),
+        {"métrica": name, "valor": float(val), "comparador": comparator,
          "ok": "✓" if flag == "✓" else "✗"}
-        for flag, name, val, thr in pattern.findall(stdout)
+        for flag, name, val, comparator in pattern.findall(stdout)
     ]
 
 

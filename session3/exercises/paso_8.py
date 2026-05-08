@@ -130,9 +130,19 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
             st.code(result.stderr, language="text")
 
     # ── HUECO 3 ────────────────────────────────────────────
-    # retrain.py imprime cada gate como línea "  ✓ name: 0.85 (umbral 0.78)".
-    # Parsea esas líneas con re.findall(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\(umbral\s+([\d.]+)", text).
-    # Construye una lista de dicts {"métrica","valor","umbral","ok"} y muéstrala.
+    # retrain.py imprime cada gate como una línea con esta forma:
+    #   "  ✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))"
+    #   "  ✗ timeseries_mape: 370.32 (≤ 200.0 (umbral inicial · sin previo))"
+    #
+    # El bloque al final entre paréntesis describe el comparador (puede tener
+    # paréntesis anidados con "previo X" o "umbral inicial"). NO uses un regex
+    # estricto que asuma "(umbral X.XX)" al final — el formato es más rico ahora.
+    #
+    # Patrón tolerante:
+    #   re.findall(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\((.*?)\)\s*$", text, re.MULTILINE)
+    # Te devuelve [(flag, name, valor, comparador_string), ...].
+    #
+    # Construye una lista de dicts {"métrica","valor","comparador","ok"}.
     # ──────────────────────────────────────────────────────
     import re
     rows = ___
