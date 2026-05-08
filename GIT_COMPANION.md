@@ -1,14 +1,14 @@
 # Git Companion — De cero a manejarte
 
-Esta guia tiene dos partes. La primera empieza desde cero absoluto. La segunda te lleva un paso mas alla. No hace falta hacer las dos de golpe.
+Esta guía tiene dos partes. La primera empieza desde cero absoluto. La segunda te lleva un paso más allá. No hace falta hacer las dos de golpe.
 
 ---
 
 # PARTE A — Tu primer repositorio
 
-## Que es Git (sin rodeos)
+## Qué es Git (sin rodeos)
 
-Cuando trabajas en un documento y quieres poder volver atras, haces copias:
+Cuando trabajas en un documento y quieres poder volver atrás, haces copias:
 
 ```
 informe_final.docx
@@ -17,11 +17,11 @@ informe_final_DEFINITIVO.docx
 informe_final_DEFINITIVO_bueno.docx
 ```
 
-Git hace lo mismo pero de forma inteligente. En vez de copiar archivos enteros, Git guarda **los cambios** que haces. Cada vez que le dices "guardame esto", Git toma una foto del estado actual de todos tus archivos. Esa foto se llama **commit**.
+Git hace lo mismo pero de forma inteligente. En vez de copiar archivos enteros, Git guarda **los cambios** que haces. Cada vez que le dices "guárdame esto", Git toma una foto del estado actual de todos tus archivos. Esa foto se llama **commit**.
 
 La diferencia con hacer copias manuales:
 - No tienes 20 versiones del mismo archivo
-- Puedes ver exactamente que cambiaste y cuando
+- Puedes ver exactamente qué cambiaste y cuándo
 - Puedes volver a cualquier punto anterior con un clic
 - Funciona con todos los archivos de un proyecto a la vez, no uno por uno
 
@@ -43,7 +43,7 @@ No vas a ver nada especial. Git trabaja en silencio. Pero ahora todo lo que pase
 
 ---
 
-## Paso 2: Crea un archivo y ve que pasa
+## Paso 2: Crea un archivo y mira qué pasa
 
 Crea un archivo. Puedes hacerlo desde VS Code (File > New File) o desde la terminal:
 
@@ -51,7 +51,7 @@ Crea un archivo. Puedes hacerlo desde VS Code (File > New File) o desde la termi
 echo "Hola, este es mi primer archivo" > notas.txt
 ```
 
-Ahora preguntale a Git que ve:
+Ahora pregúntale a Git qué ve:
 
 ```bash
 git status
@@ -64,7 +64,7 @@ Untracked files:
     notas.txt
 ```
 
-**Untracked** significa "veo este archivo, pero no lo estoy siguiendo todavia." Git sabe que `notas.txt` existe, pero no le has dicho que lo vigile.
+**Untracked** significa "veo este archivo, pero no lo estoy siguiendo todavía." Git sabe que `notas.txt` existe, pero no le has dicho que lo vigile.
 
 ---
 
@@ -81,9 +81,9 @@ Changes to be committed:
     new file: notas.txt
 ```
 
-Has pasado el archivo a la **zona de preparacion** (staging area). Es como poner cosas en una caja antes de sellarla. Todavia no has guardado nada — solo has dicho "esto va a ir en la proxima foto."
+Has pasado el archivo a la **zona de preparación** (staging area). Es como poner cosas en una caja antes de sellarla. Todavía no has guardado nada — solo has dicho "esto va a ir en la próxima foto."
 
-**Por que no guarda directamente?** Porque a veces cambias 5 archivos pero solo quieres guardar 3. El staging te deja elegir que entra en cada foto.
+**¿Por qué no guarda directamente?** Porque a veces cambias 5 archivos pero solo quieres guardar 3. El staging te deja elegir qué entra en cada foto.
 
 ---
 
@@ -93,7 +93,7 @@ Has pasado el archivo a la **zona de preparacion** (staging area). Es como poner
 git commit -m "Primer archivo del proyecto"
 ```
 
-Hecho. Git ha tomado una foto de tu proyecto. El texto entre comillas es el **mensaje del commit** — una nota para tu yo del futuro que explica que hiciste.
+Hecho. Git ha tomado una foto de tu proyecto. El texto entre comillas es el **mensaje del commit** — una nota para tu yo del futuro que explica qué hiciste.
 
 Comprueba:
 
@@ -101,7 +101,7 @@ Comprueba:
 git log
 ```
 
-Veras algo como:
+Verás algo como:
 
 ```
 commit a1b2c3d4... (HEAD -> main)
@@ -117,7 +117,7 @@ Esa es tu primera foto. Puedes volver a ella en cualquier momento.
 
 ## Paso 5: Haz cambios y observa
 
-Edita `notas.txt` — anade una linea, cambia algo, lo que quieras. Luego:
+Edita `notas.txt` — añade una línea, cambia algo, lo que quieras. Luego:
 
 ```bash
 git status
@@ -128,19 +128,19 @@ Changes not staged for commit:
     modified: notas.txt
 ```
 
-Git sabe que el archivo cambio. Si quieres ver exactamente que cambiaste:
+Git sabe que el archivo cambió. Si quieres ver exactamente qué cambiaste:
 
 ```bash
 git diff
 ```
 
-Veras las lineas antiguas (en rojo, con `-`) y las nuevas (en verde, con `+`). Esto es lo que hace Git especial: no solo sabe QUE cambio un archivo — sabe exactamente QUE lineas cambiaron.
+Verás las líneas antiguas (en rojo, con `-`) y las nuevas (en verde, con `+`). Esto es lo que hace Git especial: no solo sabe QUE cambió un archivo — sabe exactamente QUÉ líneas cambiaron.
 
 Para guardar estos cambios:
 
 ```bash
 git add notas.txt
-git commit -m "Anadida segunda linea a notas"
+git commit -m "Añadida segunda línea a notas"
 ```
 
 Ahora tienes dos fotos. Puedes ver las dos con `git log`.
@@ -149,7 +149,7 @@ Ahora tienes dos fotos. Puedes ver las dos con `git log`.
 
 ## Paso 6: Varios archivos a la vez
 
-Crea dos archivos mas:
+Crea dos archivos más:
 
 ```bash
 echo "Lista de tareas" > tareas.txt
@@ -166,7 +166,7 @@ Untracked files:
     tareas.txt
 ```
 
-Puedes anadir los dos a la vez:
+Puedes añadir los dos a la vez:
 
 ```bash
 git add .
@@ -175,25 +175,25 @@ git add .
 El punto (`.`) significa "todo lo que hay en esta carpeta." Es un atajo para no escribir cada archivo por separado.
 
 ```bash
-git commit -m "Anadidos archivos de tareas e ideas"
+git commit -m "Añadidos archivos de tareas e ideas"
 ```
 
 Ahora tu historial tiene 3 fotos:
 1. El archivo inicial
-2. La edicion
+2. La edición
 3. Los dos archivos nuevos
 
 ---
 
-## Paso 7: Vuelve atras (sin miedo)
+## Paso 7: Vuelve atrás (sin miedo)
 
-Imagina que editas `notas.txt` y lo dejas peor de como estaba. Antes de hacer commit, puedes deshacerlo:
+Imagina que editas `notas.txt` y lo dejas peor de cómo estaba. Antes de hacer commit, puedes deshacerlo:
 
 ```bash
 git checkout -- notas.txt
 ```
 
-Eso restaura el archivo al estado del ultimo commit. Los cambios que hiciste desaparecen. Es como pulsar Ctrl+Z pero para toda la sesion de edicion.
+Eso restaura el archivo al estado del último commit. Los cambios que hiciste desaparecen. Es como pulsar Ctrl+Z pero para toda la sesión de edición.
 
 **Importante:** esto solo funciona ANTES de hacer commit. Una vez que haces commit, el cambio queda en la foto. Pero puedes volver a fotos anteriores (eso lo vemos en la parte B).
 
@@ -201,12 +201,12 @@ Eso restaura el archivo al estado del ultimo commit. Los cambios que hiciste des
 
 ## Resumen de la Parte A
 
-Has aprendido el flujo basico de Git:
+Has aprendido el flujo básico de Git:
 
 ```
 Editar archivos
     ↓
-git status         (ver que cambio)
+git status         (ver qué cambió)
     ↓
 git diff           (ver los cambios exactos)
     ↓
@@ -217,7 +217,7 @@ git commit -m ""   (guardar la foto)
 git log            (ver el historial de fotos)
 ```
 
-Con estos comandos puedes trabajar en cualquier proyecto y tener siempre un historial de todo lo que has hecho. Si algo se rompe, puedes investigar que cambio y cuando.
+Con estos comandos puedes trabajar en cualquier proyecto y tener siempre un historial de todo lo que has hecho. Si algo se rompe, puedes investigar qué cambió y cuándo.
 
 ---
 
@@ -227,15 +227,15 @@ Con estos comandos puedes trabajar en cualquier proyecto y tener siempre un hist
 
 ## La idea de las ramas
 
-Hasta ahora has trabajado en una sola linea: haces cambios, los guardas, sigues. Esa linea se llama `main` (la rama principal).
+Hasta ahora has trabajado en una sola línea: haces cambios, los guardas, sigues. Esa línea se llama `main` (la rama principal).
 
 Pero a veces quieres probar algo sin arriesgar lo que ya funciona. Por ejemplo:
 
-- "Quiero cambiar el diseno de la app, pero no se si quedara bien"
+- "Quiero cambiar el diseño de la app, pero no sé si quedará bien"
 - "Quiero probar otro modelo de LLM, pero si no funciona quiero volver"
-- "Quiero reorganizar todo el codigo, pero si la lio necesito poder deshacer"
+- "Quiero reorganizar todo el código, pero si la lío necesito poder deshacer"
 
-Para eso existen las **ramas**. Una rama es una copia de tu proyecto donde puedes experimentar libremente. Si el experimento sale bien, lo unes a `main`. Si sale mal, la borras y ya esta.
+Para eso existen las **ramas**. Una rama es una copia de tu proyecto donde puedes experimentar libremente. Si el experimento sale bien, lo unes a `main`. Si sale mal, la borras y ya está.
 
 Imagina un camino que se bifurca:
 
@@ -245,7 +245,7 @@ main:          A --- B --- C
 experimento:               D --- E
 ```
 
-`A`, `B`, `C` son commits en main. En el punto `C` creas una rama y haces los commits `D` y `E` ahi. `main` sigue en `C`, intacto. Si `D` y `E` salen bien, los unes a `main`. Si no, los descartas.
+`A`, `B`, `C` son commits en main. En el punto `C` creas una rama y haces los commits `D` y `E` ahí. `main` sigue en `C`, intacto. Si `D` y `E` salen bien, los unes a `main`. Si no, los descartas.
 
 ---
 
@@ -269,28 +269,28 @@ O, en un solo paso (crear + moverte):
 git checkout -b experimento
 ```
 
-Para comprobar en que rama estas:
+Para comprobar en qué rama estás:
 
 ```bash
 git branch
 ```
 
-Veras algo como:
+Verás algo como:
 
 ```
 * experimento
   main
 ```
 
-El asterisco indica donde estas.
+El asterisco indica dónde estás.
 
 ---
 
 ## Paso 2: Trabaja en la rama
 
-Ahora estas en la rama `experimento`. Todo lo que hagas aqui NO afecta a `main`.
+Ahora estás en la rama `experimento`. Todo lo que hagas aquí NO afecta a `main`.
 
-Haz algun cambio:
+Haz algún cambio:
 
 ```bash
 echo "Esta es una idea experimental" > experimento.txt
@@ -298,10 +298,10 @@ git add .
 git commit -m "Probando una idea nueva"
 ```
 
-Edita tambien un archivo existente:
+Edita también un archivo existente:
 
 ```bash
-echo "Linea anadida desde la rama experimento" >> notas.txt
+echo "Línea añadida desde la rama experimento" >> notas.txt
 git add .
 git commit -m "Modificado notas desde experimento"
 ```
@@ -316,17 +316,17 @@ git checkout main
 
 Ahora mira tus archivos:
 - `experimento.txt` **no existe** — solo vive en la rama `experimento`
-- `notas.txt` **no tiene la linea que anadiste** — esa linea esta en la otra rama
+- `notas.txt` **no tiene la línea que añadiste** — esa línea está en la otra rama
 
-Esto es lo mas importante de las ramas: **son mundos paralelos**. Lo que haces en uno no existe en el otro hasta que decides unirlos.
+Esto es lo más importante de las ramas: **son mundos paralelos**. Lo que haces en uno no existe en el otro hasta que decides unirlos.
 
 ---
 
 ## Paso 4: Une la rama a main (merge)
 
-Tu experimento funciono. Quieres incorporar esos cambios a `main`.
+Tu experimento funcionó. Quieres incorporar esos cambios a `main`.
 
-Primero, asegurate de estar en `main`:
+Primero, asegúrate de estar en `main`:
 
 ```bash
 git checkout main
@@ -338,7 +338,7 @@ Luego, une la otra rama:
 git merge experimento
 ```
 
-Si todo va bien, veras algo como:
+Si todo va bien, verás algo como:
 
 ```
 Updating c3d4e5f..a1b2c3d
@@ -359,25 +359,25 @@ git branch -d experimento
 
 ## Paso 5: Cuando las ramas chocan (conflictos)
 
-A veces dos ramas modifican la misma linea del mismo archivo. Git no sabe cual de las dos versiones elegir. Eso se llama un **conflicto**.
+A veces dos ramas modifican la misma línea del mismo archivo. Git no sabe cuál de las dos versiones elegir. Eso se llama un **conflicto**.
 
-Vamos a provocar uno a proposito para que pierdas el miedo.
+Vamos a provocar uno a propósito para que pierdas el miedo.
 
 ### Crea el escenario
 
 ```bash
-# Asegurate de estar en main
+# Asegúrate de estar en main
 git checkout main
 
-# Edita notas.txt: cambia la primera linea
-# (abre el archivo y escribe "Version de main" en la primera linea)
+# Edita notas.txt: cambia la primera línea
+# (abre el archivo y escribe "Versión de main" en la primera línea)
 git add .
 git commit -m "Editado notas en main"
 
-# Crea una rama y edita la MISMA linea
+# Crea una rama y edita la MISMA línea
 git checkout -b otra-idea
 
-# Cambia la primera linea a "Version de otra-idea"
+# Cambia la primera línea a "Versión de otra-idea"
 git add .
 git commit -m "Editado notas en otra-idea"
 
@@ -393,60 +393,60 @@ CONFLICT (content): Merge conflict in notas.txt
 Automatic merge failed; fix conflicts and then commit the result.
 ```
 
-No pasa nada. No se ha roto nada. Git simplemente te dice: "Hay dos versiones de la misma linea y no se cual quieres. Decidelo tu."
+No pasa nada. No se ha roto nada. Git simplemente te dice: "Hay dos versiones de la misma línea y no sé cuál quieres. Decídelo tú."
 
-### Como se ve un conflicto
+### Cómo se ve un conflicto
 
-Abre `notas.txt`. Veras algo asi:
+Abre `notas.txt`. Verás algo así:
 
 ```
 <<<<<<< HEAD
-Version de main
+Versión de main
 =======
-Version de otra-idea
+Versión de otra-idea
 >>>>>>> otra-idea
 ```
 
 Las marcas son de Git:
-- Lo que hay entre `<<<<<<< HEAD` y `=======` es la version de `main` (donde estas ahora)
-- Lo que hay entre `=======` y `>>>>>>> otra-idea` es la version de la otra rama
+- Lo que hay entre `<<<<<<< HEAD` y `=======` es la versión de `main` (donde estás ahora)
+- Lo que hay entre `=======` y `>>>>>>> otra-idea` es la versión de la otra rama
 
 ### Resuelve el conflicto
 
-Tu decides que quedarte. Tienes tres opciones:
+Tú decides con qué quedarte. Tienes tres opciones:
 
-**Opcion A: Qudate con la version de main.**
+**Opción A: Quédate con la versión de main.**
 Borra todo lo de la otra rama y las marcas de Git. El archivo queda:
 ```
-Version de main
+Versión de main
 ```
 
-**Opcion B: Quedate con la version de la otra rama.**
+**Opción B: Quédate con la versión de la otra rama.**
 Borra todo lo de main y las marcas. El archivo queda:
 ```
-Version de otra-idea
+Versión de otra-idea
 ```
 
-**Opcion C: Combina las dos.**
+**Opción C: Combina las dos.**
 Escribe lo que quieras. El archivo queda:
 ```
-Version combinada de main y otra-idea
+Versión combinada de main y otra-idea
 ```
 
-Lo importante: **borra las lineas con `<<<<<<<`, `=======`, y `>>>>>>>`**. Esas son marcas de Git, no contenido real.
+Lo importante: **borra las líneas con `<<<<<<<`, `=======`, y `>>>>>>>`**. Esas son marcas de Git, no contenido real.
 
-### Guarda la resolucion
+### Guarda la resolución
 
 ```bash
 git add notas.txt
 git commit -m "Resuelto conflicto en notas"
 ```
 
-Hecho. El conflicto esta resuelto. La rama esta unida.
+Hecho. El conflicto está resuelto. La rama está unida.
 
 ---
 
-## Casos reales: cuando usar ramas
+## Casos reales: cuándo usar ramas
 
 ### Caso 1: Probar un modelo diferente
 
@@ -459,7 +459,7 @@ git checkout main
 git merge probar-gpt4
 # Si va peor:
 git checkout main
-git branch -D probar-gpt4    # la D mayuscula fuerza el borrado
+git branch -D probar-gpt4    # la D mayúscula fuerza el borrado
 ```
 
 ### Caso 2: Cambiar el prompt sin romper lo que funciona
@@ -467,8 +467,8 @@ git branch -D probar-gpt4    # la D mayuscula fuerza el borrado
 ```bash
 git checkout -b nuevo-prompt
 # Experimentas con el prompt del sistema
-# Pruebas, ajustas, pruebas mas
-# Cuando estas contento:
+# Pruebas, ajustas, pruebas más
+# Cuando estás contento:
 git checkout main
 git merge nuevo-prompt
 ```
@@ -484,29 +484,29 @@ git commit -m "Mi trabajo hasta ahora"
 git pull
 ```
 
-Si hay conflictos (porque tu cambiaste un archivo que el profesor tambien cambio), Git te avisa y los resuelves como vimos arriba.
+Si hay conflictos (porque tú cambiaste un archivo que el profesor también cambió), Git te avisa y los resuelves como vimos arriba.
 
 ---
 
-## Referencia rapida
+## Referencia rápida
 
-### Comandos del dia a dia
+### Comandos del día a día
 
-| Comando | Que hace |
+| Comando | Qué hace |
 |---|---|
-| `git status` | Ver que ha cambiado |
-| `git diff` | Ver las lineas exactas que cambiaron |
+| `git status` | Ver qué ha cambiado |
+| `git diff` | Ver las líneas exactas que cambiaron |
 | `git add .` | Preparar todos los cambios |
 | `git add archivo.py` | Preparar solo un archivo |
 | `git commit -m "mensaje"` | Guardar una foto |
 | `git log` | Ver el historial de fotos |
-| `git log --oneline` | Historial compacto (una linea por commit) |
+| `git log --oneline` | Historial compacto (una línea por commit) |
 
 ### Comandos de ramas
 
-| Comando | Que hace |
+| Comando | Qué hace |
 |---|---|
-| `git branch` | Ver en que rama estas |
+| `git branch` | Ver en qué rama estás |
 | `git branch nombre` | Crear una rama |
 | `git checkout nombre` | Moverte a una rama |
 | `git checkout -b nombre` | Crear una rama y moverte a ella |
@@ -516,19 +516,19 @@ Si hay conflictos (porque tu cambiaste un archivo que el profesor tambien cambio
 
 ### Cuando algo va mal
 
-| Situacion | Que hacer |
+| Situación | Qué hacer |
 |---|---|
 | "He cambiado un archivo y quiero deshacerlo" | `git checkout -- archivo.txt` |
 | "He hecho `git add` pero no quiero incluir ese archivo" | `git reset archivo.txt` |
-| "Hay un conflicto y no se que hacer" | Abre el archivo, busca `<<<<<<<`, decide que version quieres, borra las marcas, `git add` y `git commit` |
-| "Todo esta roto y quiero volver al ultimo commit" | `git checkout -- .` (deshace TODOS los cambios no commiteados) |
-| "Quiero ver como estaba un archivo en un commit anterior" | `git show HEAD~1:archivo.txt` (1 commit atras, 2 para dos, etc.) |
+| "Hay un conflicto y no sé qué hacer" | Abre el archivo, busca `<<<<<<<`, decide qué versión quieres, borra las marcas, `git add` y `git commit` |
+| "Todo está roto y quiero volver al último commit" | `git checkout -- .` (deshace TODOS los cambios no commiteados) |
+| "Quiero ver cómo estaba un archivo en un commit anterior" | `git show HEAD~1:archivo.txt` (1 commit atrás, 2 para dos, etc.) |
 
 ---
 
 ## Resumen en una frase
 
-Git guarda fotos de tu proyecto (commits). Las ramas te dejan experimentar sin romper nada. Los conflictos se resuelven eligiendo que version quieres. Con 10 comandos te manejas en el 99% de las situaciones.
+Git guarda fotos de tu proyecto (commits). Las ramas te dejan experimentar sin romper nada. Los conflictos se resuelven eligiendo qué versión quieres. Con 10 comandos te manejas en el 99% de las situaciones.
 
 ---
 
@@ -536,13 +536,13 @@ Git guarda fotos de tu proyecto (commits). Las ramas te dejan experimentar sin r
 
 # PARTE C — Rescate: cuando git pull sale mal
 
-Cada sesion os pedire que hagais `git pull` para descargar material nuevo. A veces eso choca con cambios que habeis hecho en vuestros archivos. Aqui teneis las recetas para salir de cualquier lio.
+Cada sesión os pediré que cambiéis de rama (`git checkout session-N`) para descargar el material nuevo. A veces eso choca con cambios que habéis hecho en vuestros archivos. Aquí tenéis las recetas para salir de cualquier lío.
 
 ---
 
-## Si todavia no habeis hecho git pull
+## Si todavía no habéis hecho el checkout
 
-Antes de nada, vamos a guardar vuestro trabajo en un sitio seguro y luego descargar lo nuevo. Copiad estas 3 lineas en la terminal, una por una:
+Antes de nada, vamos a guardar vuestro trabajo en un sitio seguro y luego descargar lo nuevo. Copiad estas 3 líneas en la terminal, una por una:
 
 ```
 git checkout -b mi-trabajo
@@ -553,21 +553,21 @@ git add -A && git commit -m "guardado mi trabajo" --allow-empty
 ```
 
 ```
-git checkout main && git fetch origin && git reset --hard origin/main
+git checkout main && git fetch origin && git checkout session-1
 ```
 
-Que acaba de pasar:
-- La primera linea crea una rama llamada `mi-trabajo` con todo lo que teneis ahora. Vuestros archivos no se pierden — estan ahi.
+Qué acaba de pasar:
+- La primera línea crea una rama llamada `mi-trabajo` con todo lo que tenéis ahora. Vuestros archivos no se pierden — están ahí.
 - La segunda guarda todo en esa rama.
-- La tercera vuelve a `main` y lo deja exactamente igual que lo que hay en GitHub. Limpio, sin conflictos, sin dramas.
+- La tercera vuelve a `main`, descarga las novedades de GitHub, y os mueve a la rama de la sesión correspondiente. Limpio, sin conflictos, sin dramas.
 
 Si os dice `branch 'mi-trabajo' already exists`, usad otro nombre: `mi-trabajo-2`, `mi-trabajo-sesion3`, lo que sea.
 
 ---
 
-## Si ya habeis hecho git pull y estais en medio de un conflicto
+## Si ya habéis hecho git pull y estáis en medio de un conflicto
 
-Sabeis que estais en un conflicto si Git os ha dicho `CONFLICT`, o si al abrir un archivo veis lineas raras con `<<<<<<<` y `>>>>>>>`, o si `git status` dice `Unmerged paths`.
+Sabéis que estáis en un conflicto si Git os ha dicho `CONFLICT`, o si al abrir un archivo veis líneas raras con `<<<<<<<` y `>>>>>>>`, o si `git status` dice `Unmerged paths`.
 
 Primero, cancelad el merge que se ha quedado a medias:
 
@@ -575,7 +575,7 @@ Primero, cancelad el merge que se ha quedado a medias:
 git merge --abort
 ```
 
-Eso os devuelve al estado de antes del pull. Ahora ya podeis hacer el proceso normal:
+Eso os devuelve al estado de antes del pull. Ahora ya podéis hacer el proceso normal:
 
 ```
 git checkout -b mi-trabajo
@@ -586,41 +586,41 @@ git add -A && git commit -m "guardado mi trabajo" --allow-empty
 ```
 
 ```
-git checkout main && git fetch origin && git reset --hard origin/main
+git checkout main && git fetch origin && git checkout session-1
 ```
 
 ---
 
 ## Si nada funciona
 
-Opcion nuclear. Funciona siempre. Renombrad vuestra carpeta y descargad el proyecto de cero:
+Opción nuclear. Funciona siempre. Renombrad vuestra carpeta y descargad el proyecto de cero:
 
 ```
 cd ..
 ```
 
 ```
-mv mda13-fitlife-workshop mda13-backup
+mv MDA13_ML MDA13_ML-backup
 ```
 
 ```
-git clone https://github.com/Kieleth/mda13-fitlife-workshop.git
+git clone <URL del repo>
 ```
 
 ```
-cd mda13-fitlife-workshop
+cd MDA13_ML
 ```
 
-Vuestro trabajo anterior esta en la carpeta `mda13-backup`. La nueva carpeta es una copia limpia de GitHub.
+Vuestro trabajo anterior está en la carpeta `MDA13_ML-backup`. La nueva carpeta es una copia limpia de GitHub.
 
-Despues de esto, recordad activar el entorno:
+Después de esto, recordad activar el entorno:
 
 ```
-conda activate mda13
+conda activate mda13_ml
 ```
 
 Y verificar que todo funciona:
 
 ```
-streamlit run test_app.py
+python setup_check.py
 ```
