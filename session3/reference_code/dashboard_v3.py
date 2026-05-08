@@ -243,16 +243,28 @@ with tab_pred:
             st.warning("Sin desc")
 
     st.divider()
-    st.subheader("📈 Histórico + forecast")
+    st.subheader("📈 Histórico + forecast (cono)")
     history = timeseries["history"]
     ts_m = timeseries["model"]   # Prophet
     future = ts_m.make_future_dataframe(periods=6, freq="MS")
     fc = ts_m.predict(future)
     forecast = fc.set_index("ds")["yhat"].iloc[-6:]
-    chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
-    if len(history) > 0 and len(forecast) > 0:
-        chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
-    st.line_chart(chart_df, height=260)
+    yhat_lower = fc.set_index("ds")["yhat_lower"].iloc[-6:]
+    yhat_upper = fc.set_index("ds")["yhat_upper"].iloc[-6:]
+
+    import plotly.graph_objects as go
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=history.index, y=history.values, name="histórico", line=dict(color="steelblue")))
+    fig.add_trace(go.Scatter(x=forecast.index, y=forecast.values, name="forecast", line=dict(color="darkorange")))
+    fig.add_trace(go.Scatter(
+        x=list(forecast.index) + list(forecast.index[::-1]),
+        y=list(yhat_upper) + list(yhat_lower[::-1]),
+        fill="toself", fillcolor="rgba(255,165,0,0.15)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name="banda 80%",
+    ))
+    fig.update_layout(height=260, margin=dict(l=0, r=0, t=20, b=0))
+    st.plotly_chart(fig, use_container_width=True)
     st.caption(f"MAPE en hold-out: {timeseries.get('validation_mape', 0):.1f}%")
 
 
@@ -357,6 +369,30 @@ with tab_harness:
             "convirtió": y_true.astype(bool),
             "arquetipo": sample["lead_segment_truth"].values,
         }), use_container_width=True, hide_index=True)
+
+        # Threshold + matriz de confusión + EV
+        st.divider()
+        st.subheader("Threshold + valor esperado")
+        threshold = st.slider("Threshold", 0.0, 1.0, 0.5, 0.05, key="harness_thr")
+
+        def _ev(y, p, thr, gain=5_000, cost=5):
+            pred = p >= thr
+            tp = int(((pred == 1) & (y == 1)).sum())
+            fp = int(((pred == 1) & (y == 0)).sum())
+            return tp, fp, tp * gain - (tp + fp) * cost
+
+        tp_c, fp_c, ev_c = _ev(y_true, proba_clf, threshold)
+        tp_l, fp_l, ev_l = _ev(y_true, proba_llm, threshold)
+
+        cm1, cm2, cm3, cm4 = st.columns(4)
+        cm1.metric("TP clf", tp_c, help="Predicho convertir y convirtió")
+        cm2.metric("FP clf", fp_c, help="Predicho convertir, no convirtió")
+        cm3.metric("EV clasificador", f"{ev_c:,} €")
+        cm4.metric("EV LLM", f"{ev_l:,} €")
+        st.caption(
+            "Gain = 5.000€/firma, coste = 5€/llamada. Mueve el slider hasta "
+            "que el EV deje de subir. **AUC mide saber, EV mide cobrar.**"
+        )
 
 
 # ──────────────────────────────────────────────────────────

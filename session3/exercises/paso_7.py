@@ -15,10 +15,12 @@
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
-# TRES huecos pequeños (es Together — Luis los tipea contigo):
+# CUATRO huecos pequeños (es Together — Luis los tipea contigo):
 #   - HUECO 1: el prompt zero-shot (réplica del paso_4).
 #   - HUECO 2: roc_auc_score del clasificador y del LLM.
 #   - HUECO 3: la barra horizontal con st.bar_chart.
+#   - HUECO 4: la fórmula de Expected Value (TP*ganancia − llamadas*coste)
+#             para decidir el threshold óptimo según economía del negocio.
 #
 # ── Cómo ejecutar ──────────────────────────────────────────
 #
@@ -271,14 +273,70 @@ if st.button("Correr el harness", type="primary"):
     })
     st.dataframe(detail, use_container_width=True, hide_index=True)
 
+    # ── Threshold + matriz de confusión + valor esperado ──────
+    #
+    # El modelo no decide, te da un número entre 0 y 1. TÚ eliges el corte.
+    # A threshold 0.3 llamas a casi todos los leads pero pocos firman.
+    # A threshold 0.8 sólo llamas a los más seguros, pero pierdes a los del
+    # medio. El AUC mide cuánto SABE el modelo. El EV mide cuánto te PAGA.
+    # No siempre coinciden.
+    st.divider()
+    st.subheader("Mueve el threshold y mira qué pasa")
+
+    threshold = st.slider("Threshold de decisión", 0.0, 1.0, 0.5, 0.05)
+
+    pred_clf = proba_clf >= threshold
+    tp_clf = int(((pred_clf == 1) & (y_true == 1)).sum())
+    fp_clf = int(((pred_clf == 1) & (y_true == 0)).sum())
+    tn_clf = int(((pred_clf == 0) & (y_true == 0)).sum())
+    fn_clf = int(((pred_clf == 0) & (y_true == 1)).sum())
+
+    st.markdown("**Matriz de confusión del clasificador**")
+    cm_col1, cm_col2 = st.columns(2)
+    cm_col1.metric("✓ True Positives", tp_clf, help="Predicho convertir y convirtió")
+    cm_col1.metric("⚠ False Positives", fp_clf, help="Predicho convertir, no convirtió")
+    cm_col2.metric("✓ True Negatives", tn_clf, help="Predicho no, no convirtió")
+    cm_col2.metric("⚠ False Negatives", fn_clf, help="Predicho no, sí convirtió")
+
+    # ── HUECO 4 ────────────────────────────────────────────
+    # Calcula el Expected Value (€) del clasificador a este threshold:
+    #   - llamar a un lead cuesta `cost_per_call` €
+    #   - cada lead que firma trae `gain_per_signing` €
+    #   - llamamos a TODOS los predichos como positivos: tp + fp
+    #   - sólo nos pagan los TRUE positives (los que firman): tp
+    #
+    # Fórmula:
+    #   ev = tp * gain_per_signing - (tp + fp) * cost_per_call
+    # ──────────────────────────────────────────────────────
+    gain_per_signing = 5_000   # € por firma
+    cost_per_call = 5          # € por llamada
+    ev_clf = ___
+
+    # Mismo cálculo para el LLM (pre-rellenado para que veas el patrón)
+    pred_llm = proba_llm >= threshold
+    tp_llm = int(((pred_llm == 1) & (y_true == 1)).sum())
+    fp_llm = int(((pred_llm == 1) & (y_true == 0)).sum())
+    ev_llm = tp_llm * gain_per_signing - (tp_llm + fp_llm) * cost_per_call
+
+    st.markdown("**Beneficio esperado a este threshold**")
+    e1, e2 = st.columns(2)
+    e1.metric("EV clasificador", f"{ev_clf:,} €")
+    e2.metric("EV LLM zero-shot", f"{ev_llm:,} €")
+    st.caption(
+        f"Asumiendo {gain_per_signing}€ por firma y {cost_per_call}€ por llamada "
+        f"sobre los {n} leads del holdout. Mueve el slider hasta que el EV deje "
+        "de subir — ese threshold es el óptimo para esta economía. Si los costes "
+        "cambian, el threshold óptimo cambia. **El AUC mide el saber, el EV mide el cobrar.**"
+    )
+
 
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """
-- **Más métricas**: añade precision, recall, F1 al umbral 0.5. ¿Qué se ve distinto?
+- **Más métricas a este threshold**: añade precision, recall, F1 manualmente con TP/FP/FN. ¿Cuál se mueve más al variar el corte?
 - **Curvas ROC superpuestas**: usa `sklearn.metrics.roc_curve` y `plotly` para dibujar las dos curvas en el mismo gráfico.
-- **Threshold tuning**: encuentra el threshold óptimo por F1 para cada modelo. ¿Coinciden?
+- **Threshold óptimo automático**: barre threshold de 0.0 a 1.0 y dibuja EV vs threshold. ¿Dónde está el máximo? ¿Coincide para clf y LLM?
 - **Coste por punto de AUC**: `cost_per_lead / (auc_llm - auc_random_baseline)`. Métrica fea pero práctica para decidir.
 - **Rebaja la calidad de la descripción**: trunca `company_description` a 30 caracteres y vuelve a evaluar el LLM. ¿Cuánta información perdió?
 """
