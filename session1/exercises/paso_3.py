@@ -19,12 +19,13 @@
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
-# CINCO huecos marcados con `___`:
+# SEIS huecos marcados con `___`:
 #   - HUECO 1: cargar timeseries.pkl
 #   - HUECO 2: extraer la serie histórica del pkl
 #   - HUECO 3: extraer el modelo Prophet del pkl
-#   - HUECO 4: hacer make_future_dataframe + predict y quedarte con `yhat`
-#   - HUECO 5: dibujar la línea histórica + forecast en st.line_chart
+#   - HUECO 4: extraer la serie de forecast (sólo yhat) del DataFrame fc
+#   - HUECO 5: el bridge para que histórico y forecast conecten visualmente
+#   - HUECO 6: el cono de incertidumbre (banda yhat_lower / yhat_upper en plotly)
 #
 # ── Cómo ejecutar ──────────────────────────────────────────
 #
@@ -36,6 +37,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import plotly.graph_objects as go
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -166,14 +168,18 @@ history: pd.Series = ___
 # ──────────────────────────────────────────────────────────
 ts_model = ___
 
+# Estos dos pasos están pre-rellenados — son mecánicos y no son la lección.
+# `fc` es el DataFrame completo que devuelve Prophet, con columnas
+# ds, yhat, yhat_lower, yhat_upper, trend, ...
+future = ts_model.make_future_dataframe(periods=forecast_months, freq="MS")
+fc = ts_model.predict(future)
+
 # ── HUECO 4 ────────────────────────────────────────────────
-# Prophet tiene una API distinta a SARIMAX. Pasos:
-#   1. Crea el dataframe futuro:
-#        future = ts_model.make_future_dataframe(periods=forecast_months, freq="MS")
-#   2. Predice (devuelve un DataFrame con ds, yhat, yhat_lower, yhat_upper):
-#        fc = ts_model.predict(future)
-#   3. Quédate sólo con los `forecast_months` valores futuros como pd.Series:
-#        forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
+# Saca la serie de forecast (sólo los valores centrales de yhat, los
+# últimos forecast_months meses) como pd.Series con index de fechas.
+#
+# Pista — UNA LÍNEA:
+#   forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
 # ──────────────────────────────────────────────────────────
 forecast: pd.Series = ___
 
@@ -203,12 +209,65 @@ st.caption(
     f"MAPE en hold-out: {ts.get('validation_mape', 0):.1f}%"
 )
 
+# ── El cono de incertidumbre ──────────────────────────────
+#
+# Una predicción de futuro NO es una línea, es un cono. La línea
+# de arriba era el centro. Cuanto más lejos miras, más se abre el
+# cono. Prophet ya te calculó los bordes en `fc["yhat_lower"]` y
+# `fc["yhat_upper"]` (intervalo al 80% por defecto). Sólo hay que
+# pintarlos.
+st.divider()
+st.subheader("🎯 El cono de incertidumbre")
+
+forecast_dates = forecast.index
+yhat_upper = fc.set_index("ds")["yhat_upper"].iloc[-forecast_months:]
+yhat_lower = fc.set_index("ds")["yhat_lower"].iloc[-forecast_months:]
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=history.index, y=history.values,
+    name="histórico", line=dict(color="steelblue"),
+))
+fig.add_trace(go.Scatter(
+    x=forecast_dates, y=forecast.values,
+    name="forecast (yhat)", line=dict(color="darkorange"),
+))
+
+# ── HUECO 6 ────────────────────────────────────────────────
+# Falta la traza que dibuja la BANDA (el cono). Plotly hace esto
+# con un único Scatter de fill="toself" y un truco: la x va "ida y
+# vuelta" (fechas hacia adelante + las MISMAS fechas hacia atrás), y
+# la y va "upper hacia adelante + lower hacia atrás". Cuando rellenas
+# con `fill="toself"`, queda un polígono cerrado entre las dos curvas.
+#
+# Pista — copia esta traza tal cual:
+#
+#   fig.add_trace(go.Scatter(
+#       x=list(forecast_dates) + list(forecast_dates[::-1]),
+#       y=list(yhat_upper) + list(yhat_lower[::-1]),
+#       fill="toself",
+#       fillcolor="rgba(255,165,0,0.15)",
+#       line=dict(color="rgba(0,0,0,0)"),
+#       name="banda 80%",
+#       showlegend=True,
+#   ))
+# ──────────────────────────────────────────────────────────
+___
+
+st.plotly_chart(fig, use_container_width=True)
+st.caption(
+    "El cono se abre con el horizonte: a 1 mes vista el modelo es "
+    "razonablemente seguro, a 12 meses vista admite que no lo sabe. "
+    "Si el cono es estrecho todo el rato, el modelo está sobreseguro "
+    "(probablemente mal calibrado). Si se abre demasiado, no es útil "
+    "para planificar."
+)
+
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """
-- **Banda de confianza del forecast**: el `predict()` de Prophet devuelve `yhat_lower` y `yhat_upper`. Píntalas como banda sombreada con `plotly`.
-- **Compara forecast vs histórico de los últimos meses**: usa `model.predict()` sobre las fechas que ya están en `history` y compara con el valor real. ¿En qué meses se equivoca más?
+- **Compara el cono vs realidad** sobre los últimos 3 meses: usa `model.predict()` sobre las fechas que ya están en `history` y mira si los valores reales caen DENTRO o FUERA del intervalo `[yhat_lower, yhat_upper]`. Si caen fuera mucho, el modelo está mal calibrado.
 - **Forecast por arquetipo**: separa la serie histórica por `lead_segment_truth` y entrena tres Prophet. ¿La forma del forecast cambia mucho?
 - **Componentes del modelo**: `model.plot_components(forecast)` te separa tendencia, estacionalidad anual, festivos. Útil para entender qué aprendió Prophet.
 - **Cross-validation interna**: `from prophet.diagnostics import cross_validation`. Te da MAPE / RMSE rolling, mucho más honesto que un único hold-out.
