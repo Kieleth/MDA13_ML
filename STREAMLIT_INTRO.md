@@ -66,8 +66,8 @@ st.metric("ROC AUC", "0.84", delta="+0.02")    # número grande con delta
 ```python
 nombre = st.text_input("Tu nombre")
 edad = st.slider("Edad", 0, 100, 25)                       # min, max, default
-opcion = st.selectbox("Plan", ["basic", "premium", "family"])
-opciones = st.multiselect("Industrias", ["SaaS", "fintech", "retail"])
+plan = st.selectbox("Plan", ["basic", "premium", "family"])
+industrias = st.multiselect("Industrias", ["SaaS", "fintech", "retail"])
 activo = st.checkbox("Mostrar inactivos")
 boton = st.button("Procesar")
 fecha = st.date_input("Fecha")
