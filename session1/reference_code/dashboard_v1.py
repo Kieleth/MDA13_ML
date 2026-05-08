@@ -24,6 +24,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
+import plotly.graph_objects as go
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -155,6 +156,18 @@ with col_clu:
     st.metric("Cluster", f"#{cluster_id} · {archetype_pred}")
     st.caption(f"arquetipo plantado: `{lead['lead_segment_truth']}`")
 
+# ── ¿Qué pesa más para el clasificador? ────────────────────
+with st.expander("¿Qué features pesan más en el clasificador?"):
+    importances = pd.Series(
+        classifier["model"].feature_importances_,
+        index=classifier["feature_names"],
+    )
+    st.bar_chart(importances.sort_values(ascending=False).head(10))
+    st.caption(
+        "Top 10 por `feature_importances_`. Si una feature que tú creías "
+        "clave NO aparece, o algo raro está arriba, vuelve a mirar los datos."
+    )
+
 # ── Series temporales ──────────────────────────────────────
 st.divider()
 st.subheader("📈 Histórico de conversiones + forecast")
@@ -165,22 +178,30 @@ ts_model = ts["model"]   # Prophet
 future = ts_model.make_future_dataframe(periods=forecast_months, freq="MS")
 fc = ts_model.predict(future)
 forecast: pd.Series = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
-ci_df = fc.set_index("ds")[["yhat_lower", "yhat_upper"]].iloc[-forecast_months:]
+yhat_lower = fc.set_index("ds")["yhat_lower"].iloc[-forecast_months:]
+yhat_upper = fc.set_index("ds")["yhat_upper"].iloc[-forecast_months:]
 
-chart_df = pd.DataFrame({
-    "histórico": history,
-    "forecast": forecast,
-})
-# Bridge: copia el último histórico al primer punto de forecast
-# para que las dos líneas conecten visualmente.
-if len(history) > 0 and len(forecast) > 0:
-    chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
+# Cono de incertidumbre — line + cone con plotly
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=history.index, y=history.values,
+    name="histórico", line=dict(color="steelblue"),
+))
+fig.add_trace(go.Scatter(
+    x=forecast.index, y=forecast.values,
+    name="forecast (yhat)", line=dict(color="darkorange"),
+))
+fig.add_trace(go.Scatter(
+    x=list(forecast.index) + list(forecast.index[::-1]),
+    y=list(yhat_upper) + list(yhat_lower[::-1]),
+    fill="toself", fillcolor="rgba(255,165,0,0.15)",
+    line=dict(color="rgba(0,0,0,0)"),
+    name="banda 80%",
+))
+fig.update_layout(height=320, margin=dict(l=0, r=0, t=20, b=0))
+st.plotly_chart(fig, use_container_width=True)
 
-st.line_chart(chart_df, height=320)
 col_a, col_b, col_c = st.columns(3)
 col_a.metric("Historia (meses)", f"{len(history)}")
 col_b.metric(f"Forecast ({forecast_months}m)", f"{forecast.sum():.0f} conversiones")
 col_c.metric("MAPE hold-out", f"{ts.get('validation_mape', 0):.1f}%")
-
-with st.expander("Ver intervalo de confianza (Prophet yhat_lower / yhat_upper)"):
-    st.dataframe(ci_df.round(1))

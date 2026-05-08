@@ -153,6 +153,21 @@ with col_pred:
         f"arquetipo plantado: `{lead['lead_segment_truth']}`"
     )
 
+# ── ¿Qué pesa más para el clasificador? ────────────────────
+#
+# El RandomForest aprende solo qué features importan. Si una feature
+# que TÚ creías clave no aparece en el top, o si algo raro está arriba,
+# vuelve a mirar los datos. La importancia es una pista, no un veredicto.
+with st.expander("¿Qué features pesan más en el clasificador?"):
+    importances = pd.Series(clf_model.feature_importances_, index=clf_features)
+    top10 = importances.sort_values(ascending=False).head(10)
+    st.bar_chart(top10)
+    st.caption(
+        "Top 10 por `feature_importances_`. Cuanto más alta la barra, "
+        "más usa el modelo esa feature para decidir. Las dummies de "
+        "`industry`/`country`/`source` aparecen separadas por valor."
+    )
+
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
@@ -160,6 +175,6 @@ st.markdown(
 - Cambia el lead seleccionado y observa cómo cambia la probabilidad. ¿Es coherente con los features?
 - Filtra el dropdown a solo los `tire_kicker` (verás muchos no-convertibles). ¿Cuántos predice el modelo como convertibles? Esos son tus falsos positivos.
 - Añade un `st.slider` para que puedas overrider `n_meetings` del lead seleccionado. Construye un nuevo `lead` con ese override y vuelve a predecir. ¿Cómo cambia la probabilidad?
-- Pinta el top 10 de `feature_importances_` del modelo (tienes acceso a `clf_model.feature_importances_` y `clf_features`).
+- En el expander de feature_importances: ¿coinciden las top con las que TÚ pensabas que importaban? Si algo raro está arriba (o abajo), eso es señal de revisar los datos.
 """
 )
