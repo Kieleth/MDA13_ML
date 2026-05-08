@@ -153,21 +153,26 @@ st.divider()
 st.subheader("📈 Histórico de conversiones + forecast")
 
 # ── HUECO 2 ────────────────────────────────────────────────
-# Saca la historia mensual del pkl. Es una pd.Series.
-#   ts["history"]  →  Serie con index mensual
+# Saca la historia mensual del pkl. Es una pd.Series con
+# index de fechas mensuales y valores = nº de conversiones.
+#   ts["history"]
 # ──────────────────────────────────────────────────────────
 history: pd.Series = ___
 
 # ── HUECO 3 ────────────────────────────────────────────────
-# Saca el modelo SARIMAX del pkl.
-#   ts["model"]  →  resultado de .fit() de SARIMAX
+# Saca el modelo Prophet del pkl.
+#   ts["model"]  →  Prophet ya entrenado
 # ──────────────────────────────────────────────────────────
 ts_model = ___
 
 # ── HUECO 4 ────────────────────────────────────────────────
-# Pídele al modelo el forecast de `forecast_months` pasos.
-#   forecast_obj = ts_model.get_forecast(steps=forecast_months)
-#   forecast = forecast_obj.predicted_mean   (es una pd.Series)
+# Prophet tiene una API distinta a SARIMAX. Pasos:
+#   1. Crea el dataframe futuro:
+#        future = ts_model.make_future_dataframe(periods=forecast_months, freq="MS")
+#   2. Predice (devuelve un DataFrame con ds, yhat, yhat_lower, yhat_upper):
+#        fc = ts_model.predict(future)
+#   3. Quédate sólo con los `forecast_months` valores futuros como pd.Series:
+#        forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
 # ──────────────────────────────────────────────────────────
 forecast: pd.Series = ___
 
@@ -187,16 +192,18 @@ st.line_chart(chart_df, height=300)
 st.caption(
     f"Historia: {len(history)} meses · "
     f"Forecast: {forecast_months} meses · "
-    f"Total proyectado: {forecast.sum():.0f} conversiones"
+    f"Total proyectado: {forecast.sum():.0f} conversiones · "
+    f"MAPE en hold-out: {ts.get('validation_mape', 0):.1f}%"
 )
 
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """
-- **Banda de confianza del forecast**: `forecast_obj.conf_int()` te da el intervalo. Píntalo como banda sombreada con plotly o matplotlib.
-- **Compara forecast vs histórico de los últimos meses**: ¿cuánto se desvía el modelo en los meses que ya conoce? Pista: `ts_model.fittedvalues`.
-- **Forecast por arquetipo**: separa la serie histórica por arquetipo y entrena tres SARIMAX. ¿La forma del forecast cambia mucho?
-- **Cambia la frecuencia**: prueba a resamplear a semanal en lugar de mensual y reentrena. ¿Mejora o empeora el AIC?
+- **Banda de confianza del forecast**: el `predict()` de Prophet devuelve `yhat_lower` y `yhat_upper`. Píntalas como banda sombreada con `plotly`.
+- **Compara forecast vs histórico de los últimos meses**: usa `model.predict()` sobre las fechas que ya están en `history` y compara con el valor real. ¿En qué meses se equivoca más?
+- **Forecast por arquetipo**: separa la serie histórica por `lead_segment_truth` y entrena tres Prophet. ¿La forma del forecast cambia mucho?
+- **Componentes del modelo**: `model.plot_components(forecast)` te separa tendencia, estacionalidad anual, festivos. Útil para entender qué aprendió Prophet.
+- **Cross-validation interna**: `from prophet.diagnostics import cross_validation`. Te da MAPE / RMSE rolling, mucho más honesto que un único hold-out.
 """
 )
