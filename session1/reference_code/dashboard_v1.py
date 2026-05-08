@@ -171,6 +171,10 @@ chart_df = pd.DataFrame({
     "histórico": history,
     "forecast": forecast,
 })
+# Bridge: copia el último histórico al primer punto de forecast
+# para que las dos líneas conecten visualmente.
+if len(history) > 0 and len(forecast) > 0:
+    chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
 
 st.line_chart(chart_df, height=320)
 col_a, col_b, col_c = st.columns(3)

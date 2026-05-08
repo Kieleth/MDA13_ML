@@ -293,6 +293,8 @@ future = ts_m.make_future_dataframe(periods=forecast_months, freq="MS")
 fc = ts_m.predict(future)
 forecast = fc.set_index("ds")["yhat"].iloc[-forecast_months:]
 chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
+if len(history) > 0 and len(forecast) > 0:
+    chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
 st.line_chart(chart_df, height=280)
 
 # Chat con modo seleccionable

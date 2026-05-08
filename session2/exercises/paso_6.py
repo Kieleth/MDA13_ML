@@ -135,8 +135,11 @@ client = get_openai_client()
 #         proba = classifier['model'].predict_proba(X)[0, 1]
 #   - `regressor` (igual estructura, target en log space; recuerda np.exp).
 #   - `clusterer` (dict con 'model', 'scaler', 'feature_names').
-#   - `timeseries` (dict con 'model' (SARIMAX fit), 'history' (Series mensual)).
-#     Para forecast: timeseries['model'].get_forecast(steps=N).predicted_mean.
+#   - `timeseries` (dict con 'model' (Prophet entrenado), 'history' (Series mensual),
+#     'validation_mape'). Para forecast:
+#         future = timeseries['model'].make_future_dataframe(periods=N, freq='MS')
+#         fc = timeseries['model'].predict(future)
+#         forecast = fc.set_index('ds')['yhat'].iloc[-N:]
 #   - `build_X(lead_dict, columns, training_features)` helper.
 #   - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
 #

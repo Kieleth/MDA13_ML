@@ -22,8 +22,8 @@
 # CINCO huecos marcados con `___`:
 #   - HUECO 1: cargar timeseries.pkl
 #   - HUECO 2: extraer la serie histórica del pkl
-#   - HUECO 3: extraer el modelo SARIMAX del pkl
-#   - HUECO 4: hacer get_forecast(steps=N) y obtener .predicted_mean
+#   - HUECO 3: extraer el modelo Prophet del pkl
+#   - HUECO 4: hacer make_future_dataframe + predict y quedarte con `yhat`
 #   - HUECO 5: dibujar la línea histórica + forecast en st.line_chart
 #
 # ── Cómo ejecutar ──────────────────────────────────────────
@@ -70,8 +70,9 @@ def load_timeseries() -> dict:
     # ── HUECO 1 ────────────────────────────────────────────
     # Carga ROOT / "session1" / "models" / "timeseries.pkl"
     # con joblib.load(...).
-    # El pkl tiene dos cosas: 'model' (SARIMAX fit) y
-    # 'history' (serie pd.Series con la historia mensual).
+    # El pkl tiene tres cosas: 'model' (Prophet ya entrenado),
+    # 'history' (pd.Series con la historia mensual) y
+    # 'validation_mape' (MAPE en hold-out de los últimos 3 meses).
     # ──────────────────────────────────────────────────────
     return ___
 
@@ -177,14 +178,20 @@ ts_model = ___
 forecast: pd.Series = ___
 
 # ── HUECO 5 ────────────────────────────────────────────────
-# Combina historia y forecast en un solo DataFrame para
-# que st.line_chart lo dibuje bien (con dos columnas).
+# Combina historia y forecast en un solo DataFrame.
 #
-# Ejemplo:
+# Ejemplo (con BRIDGE para que las dos líneas se vean conectadas):
+#
 #   chart_df = pd.DataFrame({
 #       "histórico": history,
 #       "forecast":  forecast,
 #   })
+#   # Sin esto el chart tiene un hueco visual: la última fecha del
+#   # histórico tiene forecast=NaN y la primera del forecast tiene
+#   # histórico=NaN. Repetimos el último histórico en la columna
+#   # forecast para que la línea conecte:
+#   if len(history) > 0 and len(forecast) > 0:
+#       chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
 # ──────────────────────────────────────────────────────────
 chart_df = ___
 
