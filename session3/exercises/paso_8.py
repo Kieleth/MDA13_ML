@@ -79,10 +79,12 @@ else:
         gates = flag.get("gates", {})
         rows = []
         for name, info in gates.items():
+            # Mismo formato que la sección dry-run de abajo: comparador como string.
+            symbol = "≥" if info["passed"] else "<"  # higher_is_better implicit aquí
             rows.append({
                 "métrica": name,
                 "valor": round(info["metric"], 3),
-                "umbral": info["threshold"],
+                "comparador": f"{symbol} {info['threshold']}",
                 "ok": "✓" if info["passed"] else "✗",
             })
         if rows:
