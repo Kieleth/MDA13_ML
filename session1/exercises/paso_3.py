@@ -178,22 +178,22 @@ ts_model = ___
 forecast: pd.Series = ___
 
 # ── HUECO 5 ────────────────────────────────────────────────
-# Combina historia y forecast en un solo DataFrame.
+# El DataFrame ya está montado. Lo que falta es el **bridge**: una
+# línea que conecte el último valor histórico con el primero del
+# forecast. Sin ella, la gráfica tiene un hueco visual (porque la
+# última fecha histórica tiene forecast=NaN y la primera fecha del
+# forecast tiene histórico=NaN).
 #
-# Ejemplo (con BRIDGE para que las dos líneas se vean conectadas):
+# Pista — UNA LÍNEA exacta:
 #
-#   chart_df = pd.DataFrame({
-#       "histórico": history,
-#       "forecast":  forecast,
-#   })
-#   # Sin esto el chart tiene un hueco visual: la última fecha del
-#   # histórico tiene forecast=NaN y la primera del forecast tiene
-#   # histórico=NaN. Repetimos el último histórico en la columna
-#   # forecast para que la línea conecte:
-#   if len(history) > 0 and len(forecast) > 0:
-#       chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
+#   chart_df.loc[history.index[-1], "forecast"] = history.iloc[-1]
+#
+# Repite el último histórico en la columna forecast en esa misma
+# fecha. Streamlit dibuja las dos columnas y la transición queda
+# continua.
 # ──────────────────────────────────────────────────────────
-chart_df = ___
+chart_df = pd.DataFrame({"histórico": history, "forecast": forecast})
+___   # ← escribe aquí el bridge (1 línea)
 
 st.line_chart(chart_df, height=300)
 st.caption(
