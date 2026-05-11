@@ -1,14 +1,23 @@
 # ============================================================
-# paso_1.py — Tu primera Streamlit + clasificador
+# paso_1.py — Primera herramienta: el clasificador, servido
 # ============================================================
 #
-# ── ¿Qué construyes? ────────────────────────────────────────
+# ── Marco del taller ───────────────────────────────────────
 #
-# Una página web con Streamlit que te deja:
-#   1. Elegir un lead de Cañadata por su lead_id
-#   2. Ver sus features
-#   3. Ver la probabilidad de conversión que predice el
-#      clasificador que entrenaste en pre_class/1_classical_models.ipynb
+# Este taller va sobre LLM con herramientas. El LLM es el
+# protagonista, pero un LLM solo alucina números. Para hacer
+# ML de verdad, el LLM necesita HERRAMIENTAS que sabe cuándo
+# usar. Hoy construimos esas herramientas. Tú las usas a mano
+# primero — para saber qué entran y qué sacan. Mañana se las
+# damos al LLM.
+#
+# ── Qué construyes ─────────────────────────────────────────
+#
+# La primera herramienta: una interfaz Streamlit que carga el
+# clasificador entrenado en pre_class/ y, para cualquier lead
+# de Cañadata que elijas, te devuelve la probabilidad de que
+# convierta. Esta misma función la llamará el LLM mañana
+# desde paso_6 (modo operador).
 #
 # ── ¿Qué tienes que arreglar? ──────────────────────────────
 #

@@ -4,14 +4,17 @@
 #
 # ── Reto ────────────────────────────────────────────────────
 #
-# Tienes el dashboard del paso_3 (S1) con cuatro modelos clásicos
-# servidos. Ahora añades una QUINTA opinión: la del LLM.
+# Ayer construimos cuatro herramientas. Hoy se las damos al LLM,
+# en tres niveles. Empezamos por el primer nivel: **sin herramientas**.
 #
-# El LLM no ha visto los datos. Le damos sólo la descripción libre
-# del lead (`company_description`) y le pedimos un número 0-100 con
-# la probabilidad de conversión. Luego comparamos:
+# El LLM ve sólo la descripción libre del lead (`company_description`)
+# y le pedimos un número 0-100. Sin features estructuradas, sin
+# DataFrame, sin modelos entrenados. **Es el techo del LLM solo.**
 #
-#   clasificador entrenado  vs  LLM zero-shot  vs  realidad
+# Por qué lo hacemos: para tener el SUELO de comparación. Cuando
+# en paso_5 y paso_6 le demos herramientas al LLM, querrás saber
+# cuánto suben respecto a este suelo. Sin esta medida, no sabes
+# si darle herramientas vale la pena.
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
