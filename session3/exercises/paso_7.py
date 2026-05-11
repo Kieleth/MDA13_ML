@@ -4,14 +4,24 @@
 #
 # ── Reto ────────────────────────────────────────────────────
 #
-# Hasta ahora hemos comparado clásico vs LLM en leads SUELTOS.
-# Aquí lo hacemos en serio: 100 leads del holdout (que ningún
-# modelo ha visto), tres métricas, y leemos juntos la tabla.
+# Ayer le dimos al LLM las herramientas. Hoy MEDIMOS cómo las
+# usa. Sobre 100 leads del holdout (que ningún modelo ha visto):
+#
+#   - Cuánto cuesta cada predicción del LLM (€/pred, latencia)
+#   - Si el LLM con sus herramientas acierta MÁS que las
+#     herramientas usadas directamente
+#   - Si las diferencias que vemos son señal o ruido (bootstrap CI)
 #
 # El harness corre por debajo:
-#   - Para cada lead del holdout, predice con el clasificador.
-#   - Para cada lead, pide al LLM zero-shot un score 0-100.
-#   - Calcula ROC-AUC, coste medio por predicción, latencia.
+#   - Para cada lead del holdout, predice con la herramienta
+#     directamente (clasificador clásico, sin LLM).
+#   - Para cada lead, pide al LLM un score 0-100 leyendo la
+#     descripción libre (paso_4 baseline: LLM sin herramientas).
+#   - Calcula ROC-AUC, coste medio por predicción, latencia, e
+#     intervalos de confianza por bootstrap.
+#
+# La pregunta que estamos respondiendo: ¿el LLM con herramientas
+# justifica su coste vs ejecutar la herramienta directa?
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
