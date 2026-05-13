@@ -2,6 +2,19 @@
 
 S1 entrenaste herramientas. S2 las pusiste detrás de un LLM. Hoy mides si todo eso justifica su coste, montas puertas de calidad, y construyes el flujo entero del lunes ("entran 150 leads nuevos, ¿cómo redesplegamos?").
 
+## Antes de empezar
+
+Si tienes cambios sin commitear de S2 en tu working tree (paso_4/5/6 con huecos rellenados), commitea o stashea antes de cambiar de rama:
+
+```sh
+git status                 # ¿hay rojo en session2/?
+git stash push -m "s2_test" # opción A: guardar para luego
+# o:
+git checkout -- session2/  # opción B: descartar
+```
+
+Los archivos `.pkl` de S1 (`session1/models/*.pkl`) están en `.gitignore`. **Persisten en tu working tree al cambiar de rama** si ya los entrenaste en S1. Si has hecho clone fresco hoy, primero corre `pre_class/1_classical_models.ipynb` para regenerarlos.
+
 ## Orden
 
 1. `exercises/paso_7.py` — **Comparison harness** sobre 100 leads del holdout. Clasificador clásico vs LLM zero-shot, con AUC, bootstrap CI, coste y latencia. **TOGETHER**: Luis tipea contigo.
@@ -29,11 +42,13 @@ streamlit run session3/exercises/paso_N.py
 ## Lo que se mide en paso_7
 
 Sobre 100 leads del holdout (que ningún modelo ha visto):
-- **ROC-AUC** del clasificador clásico vs LLM zero-shot.
-- **Bootstrap CI 95%** (1000 remuestreos). Si los intervalos se solapan, NO puedes decir que un modelo gana.
-- **Coste** total y por predicción.
-- **Latencia** media (LLM es 100× más lento que el clasificador).
+- **ROC-AUC** del clasificador clásico vs LLM zero-shot. AUC = probabilidad de que un par random (positivo, negativo) tenga el positivo con score más alto. 0.5 = aleatorio, 1.0 = perfecto.
+- **Bootstrap CI 95%** (1000 remuestreos con reemplazo). Si los intervalos se solapan, NO puedes decir que un modelo gana. Es bootstrap independiente, no pareado (lo más correcto en producción sería pareado o DeLong test).
+- **Coste** total y por predicción, en m€ (milésimas de euro: 1000 m€ = 1 €).
+- **Latencia** media. El LLM es ~30× más lento POR LEAD que el clasificador (que vectoriza), y ~1300× si comparas latencia/lead vs clf vectorizado para los 50.
 - **Expected Value** dado un threshold y la economía del negocio (`gain_per_signing`, `cost_per_call`). El AUC mide saber, el EV mide cobrar.
+
+Las columnas `converted` y `lead_segment_truth` del holdout vienen plantadas en pre-class (`pre_class/1_classical_models.ipynb`); son la **ground truth** contra la que se evalúan los modelos.
 
 ## Quality gates (paso_8)
 
@@ -54,9 +69,11 @@ Pipeline completa en una página. File uploader → dry-run → deploy → cache
 
 Al final escribes una frase:
 
-> "Para mi caso real, desplegaría X porque Y."
+> "Para [mi caso real / Cañadata si no tengo caso propio], desplegaría X porque Y."
 
 Con `X ∈ {LLM solo, LLM con herramientas, herramienta sola, híbrido}`. No hay respuesta correcta; hay decisión articulada. Eso es lo que te llevas.
+
+Si no tienes un caso real en mente, usa el de Cañadata: 700 leads/mes con scoring, ACV medio ~9K€, conversión 35-40%. La plantilla con preguntas guiadas está en [`decision_framework.md`](decision_framework.md) (mismo directorio).
 
 ## Take-home
 
@@ -65,3 +82,5 @@ Con `X ∈ {LLM solo, LLM con herramientas, herramienta sola, híbrido}`. No hay
 ## Referencia
 
 `reference_code/dashboard_v3.py` — el dashboard integrado con los 3 modos LLM + harness de comparación + ship-it pipeline. Lo lanza el profesor al final como reveal. Mira aquí si te bloqueas, pero después de intentar tú.
+
+**Si en S2 te quedaste atascado y los 3 modos LLM del dashboard te parecen magia**: abre primero `session2/exercises/paso_6.py` (versión simplificada del modo operador) o `session2/reference_code/dashboard_v2.py` (los 3 modos en una página). dashboard_v3 hereda S2 sin recap.

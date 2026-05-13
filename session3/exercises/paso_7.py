@@ -88,7 +88,7 @@ _preflight()
 # ── Sentinel para huecos sin rellenar ────────────────────
 # Muestra warning friendly y para la app limpio. Los componentes
 # de arriba ya han renderizado; los de abajo no, hasta que rellenes.
-def _hueco(n: int, desc: str = ""):
+def _hueco(n, desc: str = ""):
     st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
     st.stop()
 
@@ -222,16 +222,21 @@ if st.button("Correr el harness", type="primary"):
 
     y_true = sample["converted"].astype(int).values
 
-    # ── HUECO 2 ────────────────────────────────────────────
-    # Calcula ROC-AUC para cada modelo. Si el holdout sale
-    # con sólo una clase (todos True o todos False), AUC no
-    # se puede calcular y devuelve NaN — en ese caso usa np.nan.
+    # ── HUECO 2a + HUECO 2b ────────────────────────────────
+    # Calcula ROC-AUC para cada modelo. Son DOS asignaciones (clf y LLM),
+    # pero el patrón es idéntico. Si el holdout sale con sólo una clase
+    # (todos True o todos False), AUC no se puede calcular y devuelve NaN.
+    #
+    # Anclaje conceptual: AUC = probabilidad de que un par random
+    # (positivo, negativo) tenga el positivo con score más alto. 0.5 =
+    # aleatorio (moneda), 1.0 = perfecto (separación total).
+    #
     # Pista:
     #   from sklearn.metrics import roc_auc_score
     #   auc_clf = roc_auc_score(y_true, proba_clf) if len(set(y_true)) > 1 else float("nan")
     # ──────────────────────────────────────────────────────
-    auc_clf = _hueco(2, "roc_auc_score(y_true, proba_clf) con fallback a NaN si len(set(y_true)) < 2")
-    auc_llm = _hueco(2, "roc_auc_score(y_true, proba_llm) con el mismo guard")
+    auc_clf = _hueco("2a", "roc_auc_score(y_true, proba_clf) con fallback a NaN si len(set(y_true)) < 2")
+    auc_llm = _hueco("2b", "mismo patrón con proba_llm")
 
     # ── Bootstrap CI (humildad estadística) ─────────────────
     #
@@ -239,7 +244,15 @@ if st.button("Correr el harness", type="primary"):
     # podría ser ruido. Bootstrap te da el intervalo de confianza al 95%.
     # Si los CI se solapan, NO puedes decir que un modelo es mejor que el otro.
     #
-    # 1000 remuestreos con reemplazo. ~0.5s extra. Te ahorra discusiones.
+    # Mecánica: 1000 veces remuestreamos los `n` leads con reemplazo
+    # (algunos repiten, otros no aparecen), calculamos el AUC, y al final
+    # tomamos los percentiles 2.5 y 97.5 de esa distribución → CI 95%.
+    #
+    # ⚠ Nota técnica: usamos bootstrap INDEPENDIENTE por modelo. Lo más
+    # correcto sería pareado sobre la diferencia de AUCs (ambos modelos
+    # sobre el mismo remuestreo). El conservador "si se solapan, no afirmes"
+    # nos sirve para clase. Si te lo cuestionan en producción, hablamos de
+    # bootstrap pareado o DeLong test.
     def bootstrap_auc_ci(y, p, n_boot=1000, seed=0):
         rng = np.random.default_rng(seed)
         m = len(y)
@@ -257,23 +270,24 @@ if st.button("Correr el harness", type="primary"):
     else:
         clf_lo = clf_hi = llm_lo = llm_hi = float("nan")
 
-    # Costes (tarifas a fecha de hoy: gpt-4.1-mini ≈ 0.40€ / 1M input, 1.60€ / 1M output)
-    cost = (total_in_tok * 0.40 + total_out_tok * 1.60) / 1_000_000
-    cost_per_lead = cost / n
+    # Costes (tarifas gpt-4.1-mini ene-2026: $0.40 / 1M input, $1.60 / 1M output, 0.93 USD→EUR)
+    cost_usd = (total_in_tok * 0.40 + total_out_tok * 1.60) / 1_000_000
+    cost_eur = cost_usd * 0.93
+    cost_per_lead_meur = cost_eur * 1000 / n  # m€ = milésimas de euro
 
     st.subheader("Resultados agregados")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
         "ROC-AUC clasificador",
         f"{auc_clf:.3f}" if not np.isnan(auc_clf) else "n/d",
-        help=f"95% CI: [{clf_lo:.3f}, {clf_hi:.3f}]" if not np.isnan(clf_lo) else None,
+        help=f"95% CI: [{clf_lo:.3f}, {clf_hi:.3f}]. AUC = probabilidad de ranking correcto entre un par random (positivo, negativo). 0.5 aleatorio, 1.0 perfecto." if not np.isnan(clf_lo) else None,
     )
     c2.metric(
         "ROC-AUC LLM zero-shot",
         f"{auc_llm:.3f}" if not np.isnan(auc_llm) else "n/d",
         help=f"95% CI: [{llm_lo:.3f}, {llm_hi:.3f}]" if not np.isnan(llm_lo) else None,
     )
-    c3.metric("Coste LLM total", f"{cost*100:.3f} cent")
+    c3.metric("Coste LLM total", f"{cost_eur*1000:.2f} m€", help="m€ = milésimas de euro. 1000 m€ = 1 €.")
     c4.metric("Latencia LLM media", f"{t_llm/n:.2f} s/lead")
 
     # Humildad estadística explícita
@@ -331,6 +345,10 @@ if st.button("Correr el harness", type="primary"):
     # A threshold 0.8 sólo llamas a los más seguros, pero pierdes a los del
     # medio. El AUC mide cuánto SABE el modelo. El EV mide cuánto te PAGA.
     # No siempre coinciden.
+    #
+    # Puente conceptual: AUC promedia sobre TODOS los thresholds posibles
+    # (toda la curva ROC). Aquí fijamos UN threshold concreto para decidir.
+    # Es el paso de "saber rankear" a "tomar la decisión de a quién llamar".
     st.divider()
     st.subheader("Mueve el threshold y mira qué pasa")
 
@@ -356,8 +374,15 @@ if st.button("Correr el harness", type="primary"):
     #   - llamamos a TODOS los predichos como positivos: tp + fp
     #   - sólo nos pagan los TRUE positives (los que firman): tp
     #
-    # Fórmula:
-    #   ev = tp * gain_per_signing - (tp + fp) * cost_per_call
+    # Derivación:
+    #   ingreso  = tp * gain_per_signing     (los que sí firman, sí pagan)
+    #   gasto    = (tp + fp) * cost_per_call (a TODOS los predichos llamamos)
+    #   ev       = ingreso - gasto
+    #
+    # Lo que NO modelamos aquí: FN (los positivos que dejamos pasar). Son
+    # COSTE DE OPORTUNIDAD, no coste contable. En tu negocio real puedes
+    # añadirlos restando `fn * gain_per_signing * prob_recuperacion` si
+    # mides la probabilidad de re-engage.
     # ──────────────────────────────────────────────────────
     gain_per_signing = 5_000   # € por firma
     cost_per_call = 5          # € por llamada
@@ -392,7 +417,7 @@ with st.expander("✅ Valores esperados (sanity check sobre 50 leads del holdout
 - **EV @ threshold 0.5** con 5000 €/firma y 5 €/llamada: clf gana al LLM por ~factor 5-10×.
 """)
 st.divider()
-st.subheader("🚀 Si te quedas con ganas")
+st.subheader("🚀 Opcional: caminos para profundizar")
 st.markdown(
     """
 - **Más métricas a este threshold**: añade precision, recall, F1 manualmente con TP/FP/FN. ¿Cuál se mueve más al variar el corte?

@@ -386,6 +386,8 @@ def main() -> int:
 
     print(f"\n{'═' * 60}")
     print(f"  retrain.py · {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  Clasificador: {'XGBoost' if USE_XGBOOST else 'RandomForest'} "
+          f"({'xgboost instalado' if USE_XGBOOST else 'fallback: xgboost no disponible'})")
     print(f"{'═' * 60}\n")
 
     baseline = Path(args.baseline) if args.baseline else DATA_DIR / "canadata_leads.csv"

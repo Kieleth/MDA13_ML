@@ -5,12 +5,29 @@
 # ── Reto ────────────────────────────────────────────────────
 #
 # Antes de dar al botón "redeploy", queremos verificar que el modelo
-# nuevo no es peor que el que tenemos. Eso son **quality gates**:
+# nuevo no es peor que el "modelo desplegado actualmente" (los `.pkl`
+# que tu app está usando ahora mismo). Eso son **quality gates**:
 # umbrales mínimos por métrica. Si alguno falla, no despliegas.
 #
-# Aquí construyes la UI alrededor del script `session3/retrain.py`
-# que ya hemos visto. La UI:
-#   1. Lee el sello del último entrenamiento (`session1/models/_retrained_at.json`).
+# Aquí construyes la UI alrededor del script `session3/retrain.py`.
+# Flujo (importante tenerlo claro):
+#
+#   paso_8 (UI)  ──subprocess.run──>  retrain.py
+#       │                                  │
+#       │                                  ├─ entrena los 4 modelos
+#       │                                  ├─ evalúa gates vs JSON flag previo
+#       │                                  └─ imprime resultado (✓/✗ por gate)
+#       │  <──stdout/returncode────────────┘
+#       │
+#       └─ parsea stdout, decide enseñar botón de deploy
+#
+# Por qué subprocess y no `import retrain`:
+#   - Aislamiento: si retrain.py falla, no tumba el dashboard.
+#   - retrain.py es un script ejecutable independiente (puede correrlo cron,
+#     CI, etc.), no sólo una librería. Compartir esa CLI es la interfaz.
+#
+# La UI:
+#   1. Lee el sello del último deploy (`session1/models/_retrained_at.json`).
 #   2. Permite lanzar `retrain.py --dry-run` y ver los gates.
 #   3. Si todos pasan, ofrece el botón de "deploy" (sin --dry-run).
 #
@@ -55,7 +72,10 @@ def _hueco(n: int, desc: str = ""):
 
 
 st.title("🚦 Cañadata — paso 8: quality gates antes de desplegar")
-st.caption("Antes de cambiar los modelos en producción, exigimos que pasen umbrales mínimos.")
+st.caption(
+    "Antes de cambiar los `.pkl` que el dashboard está usando ahora, exigimos que el "
+    "modelo nuevo pase umbrales mínimos. Los umbrales se comparan al modelo desplegado actualmente."
+)
 
 
 # ── HUECO 1 ────────────────────────────────────────────────
@@ -79,7 +99,7 @@ if flag is None:
         "Ejecuta uno (botón abajo) o usa los modelos del warm-up de pre-class."
     )
 else:
-    st.subheader("Estado actual de los modelos en producción")
+    st.subheader("Estado actual de los modelos desplegados")
     c1, c2 = st.columns([1, 2])
     c1.metric("Último entrenamiento", flag.get("timestamp", "?"))
     c1.metric("Filas usadas", f"{flag.get('rows_used', 0):,}")
@@ -130,6 +150,11 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
         # Lanza retrain.py con --dry-run via subprocess.run.
         # Argumentos: [sys.executable, str(RETRAIN), "--dry-run", *batch_arg]
         # Captura stdout y stderr (capture_output=True, text=True), cwd=ROOT.
+        #
+        # Por qué subprocess y no `import retrain`: queremos aislamiento (un
+        # fallo de retrain no debe tumbar el dashboard) y retrain.py es
+        # también ejecutable standalone desde CLI. Compartir esa CLI es la
+        # interfaz contractual entre la UI y el job de entrenamiento.
         # ──────────────────────────────────────────────────
         result = _hueco(2, "subprocess.run con [sys.executable, str(RETRAIN), '--dry-run', *batch_arg]")
 
@@ -147,6 +172,13 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
     # retrain.py imprime cada gate como una línea con esta forma:
     #   "  ✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))"
     #   "  ✗ timeseries_mape: 370.32 (≤ 200.0 (umbral inicial · sin previo))"
+    #
+    # ¿Por qué parseamos texto en vez de leer un JSON estructurado? Porque
+    # retrain.py es un script humano-friendly: imprime una tabla legible.
+    # En tu caso real, refactorizarías retrain.py para que emita JSON por
+    # stdout (`--format json`) y aquí harías `json.loads(result.stdout)`.
+    # Para clase preferimos la forma "heredas un subproceso ajeno y parseas
+    # lo que te de", que es lo más común cuando integras herramientas existentes.
     #
     # El bloque al final entre paréntesis describe el comparador (puede tener
     # paréntesis anidados con "previo X" o "umbral inicial"). NO uses un regex
@@ -170,6 +202,12 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
 
 st.divider()
 st.subheader("Deploy real")
+st.caption(
+    "Política de gates: el modelo nuevo debe estar al **95% o mejor** del valor del modelo "
+    "desplegado actualmente, en cada métrica. ¿Por qué 95%? Tolera degradación pequeña por "
+    "ruido (no exigimos que el nuevo siempre supere al actual, eso bloquearía deploys legítimos), "
+    "pero rechaza un modelo claramente peor. Si quieres ser más estricto, sube el umbral en `retrain.py`."
+)
 
 if st.session_state.last_dry_run is None:
     st.info("Lanza primero el dry-run para verificar que los gates pasan.")
@@ -186,9 +224,11 @@ else:
             result = _hueco(4, "subprocess.run igual que HUECO 2 pero SIN --dry-run")
 
         if result.returncode == 0:
-            st.success("✓ Deploy completado. Recarga el dashboard para ver los nuevos modelos.")
-            # Borrar caches para que la app vuelva a cargar los .pkl
+            st.success("✓ Deploy completado. Las cachés se limpian y el dashboard verá los modelos nuevos al refrescar.")
+            # Borrar caches para que la app vuelva a cargar los .pkl. Limpiamos
+            # cache_resource (modelos .pkl) y cache_data (CSV, flag JSON).
             st.cache_resource.clear()
+            st.cache_data.clear()
             st.balloons()
         else:
             st.error("El deploy falló. Mira el output:")
@@ -204,7 +244,7 @@ with st.expander("✅ Valores esperados (sanity check)"):
 - **Returncode de retrain.py**: 0 si todos los gates pasan, 1 si alguno falla. Si falla en dry-run, el deploy real queda bloqueado.
 """)
 st.divider()
-st.subheader("🚀 Si te quedas con ganas")
+st.subheader("🚀 Opcional: caminos para profundizar")
 st.markdown(
     """
 - **Más gates**: añade un gate de **estabilidad** (que la distribución de predicciones nuevas no se desvíe >X% de la antigua usando KL-divergence o Wasserstein). Útil para detectar drift.

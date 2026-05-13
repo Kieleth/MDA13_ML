@@ -126,15 +126,21 @@ st.subheader("2. Sube un batch nuevo")
 
 # ── HUECO 1 ────────────────────────────────────────────────
 # Streamlit tiene `st.file_uploader("...", type="csv")`. Cuando el
-# usuario sube un archivo, lo guardas como NEW_BATCH (sobrescribe el
-# anterior). Pista:
+# usuario sube un archivo, guárdalo como NEW_BATCH.
+#
+# ⚠ Cuidado: si machacas NEW_BATCH directamente, pierdes el batch
+# canónico que viene en el repo. Mejor backup antes:
+#
 #   uploaded = st.file_uploader("CSV de leads nuevos", type="csv")
 #   if uploaded is not None:
 #       NEW_DATA_DIR.mkdir(parents=True, exist_ok=True)
+#       if NEW_BATCH.exists():
+#           # backup automático del batch anterior
+#           NEW_BATCH.rename(NEW_BATCH.with_suffix(".csv.bak"))
 #       NEW_BATCH.write_bytes(uploaded.getvalue())
-#       st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)}")
+#       st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)} (anterior → .csv.bak)")
 # ──────────────────────────────────────────────────────────
-_hueco(1, "st.file_uploader y guardar bytes en NEW_BATCH (5-6 líneas)")
+_hueco(1, "st.file_uploader + backup del NEW_BATCH anterior antes de sobrescribir")
 
 # Si ya hay un batch, dale opción de mostrarlo
 if NEW_BATCH.exists():
@@ -197,6 +203,10 @@ if not ready:
 else:
     confirm = st.checkbox("Sé lo que hago: reemplazar los modelos en `session1/models/`")
     if confirm and st.button("⚠ DEPLOY", type="primary"):
+        # ⚠ Captura el "antes" ANTES del deploy. El swap reescribe el JSON
+        # flag, así que después load_flag() te da el "después". Si quieres
+        # comparar antes/después en HUECO 5, tienes que persistirlo ahora.
+        st.session_state.before_flag = load_flag()
         with st.spinner("Reentrenando y desplegando…"):
             # ── HUECO 3 ────────────────────────────────────
             # Igual que HUECO 2 pero `dry_run=False`. Esto SI hace swap.
@@ -206,11 +216,16 @@ else:
             st.success("✓ Deploy hecho. Refrescando modelos…")
 
             # ── HUECO 4 ────────────────────────────────────
-            # Limpia el cache de Streamlit para que las funciones que cargan
-            # los .pkl los relean. Pista:
+            # Limpia los caches de Streamlit para que las funciones que cargan
+            # los .pkl los relean del disco (sin esto, ves los modelos viejos
+            # en cache). Y `st.rerun()` fuerza re-ejecución del script desde
+            # cero — Streamlit ya re-ejecuta al cambiar widgets, pero aquí
+            # queremos un refresh ahora, sin esperar interacción.
+            #
+            # Pista:
             #   st.cache_resource.clear()
             #   st.cache_data.clear()
-            # Y luego recarga la página: st.rerun() (Streamlit ≥1.27).
+            #   st.rerun()
             # ──────────────────────────────────────────────
             _hueco(4, "st.cache_resource.clear() + st.cache_data.clear() + st.rerun()")
         else:
@@ -224,14 +239,42 @@ st.divider()
 st.subheader("5. Antes vs después")
 
 # ── HUECO 5 ────────────────────────────────────────────────
-# Lee el JSON flag más reciente y compara con session_state.ship_dry
-# (los gates DEL DRY-RUN, que son los que se acaban de aplicar tras deploy).
-# Pinta una tabla de 2 columnas: "antes" (lo que había antes), "después"
-# (lo recién deplegado).
+# Compara métricas antes y después del deploy. Las dos fuentes:
 #
-# Si no hay "antes" (primer deploy), muestra sólo los actuales.
+#   antes  = st.session_state.get("before_flag")   # capturado pre-deploy
+#   ahora  = load_flag()                            # estado post-deploy
+#
+# Casos:
+#   - antes is None: primer deploy de la app, no hay "antes" que comparar.
+#                    Muestra st.info y opcionalmente las métricas de `ahora`.
+#   - antes existe: por cada gate en `ahora["gates"]`, busca la misma
+#                   métrica en `antes["gates"]` y muestra valor antiguo,
+#                   valor nuevo, y delta.
+#
+# Esqueleto sugerido (rellena los TODO):
+#
+#   antes = st.session_state.get("before_flag")
+#   ahora = load_flag()
+#   if ahora is None:
+#       st.info("No hay flag de deploy. Lanza un deploy primero.")
+#   elif antes is None:
+#       st.info("Primer deploy de esta app. No hay 'antes' que comparar.")
+#       # opcional: tabla con sólo `ahora`
+#   else:
+#       rows = []
+#       for name, info_new in ahora.get("gates", {}).items():
+#           info_old = antes.get("gates", {}).get(name, {})
+#           valor_antes = info_old.get("metric", float("nan"))
+#           valor_ahora = info_new["metric"]
+#           rows.append({
+#               "métrica": name,
+#               "antes": round(valor_antes, 3),
+#               "ahora": round(valor_ahora, 3),
+#               "delta": round(valor_ahora - valor_antes, 3),
+#           })
+#       # TODO: muestra con st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 # ──────────────────────────────────────────────────────────
-_hueco(5, "tabla comparativa antes/después leyendo flag y session_state.ship_dry")
+_hueco(5, "tabla antes/después usando st.session_state.before_flag y load_flag()")
 
 
 st.divider()
@@ -244,7 +287,7 @@ with st.expander("✅ Valores esperados (sanity check)"):
 - **Si los gates fallan**: el botón DEPLOY queda deshabilitado. Mira el output del dry-run para identificar qué métrica no pasó.
 """)
 st.divider()
-st.subheader("🚀 Si te quedas con ganas")
+st.subheader("🚀 Opcional: caminos para profundizar")
 st.markdown(
     """
 - **Auto-trigger por archivo**: monitoriza `session3/new_data/` con `watchdog` y dispara el dry-run cuando aparece un archivo nuevo.
