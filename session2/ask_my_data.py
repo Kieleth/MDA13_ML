@@ -10,6 +10,7 @@
 import os
 import re
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -52,9 +53,13 @@ def ask(question: str) -> None:
     raw = resp.choices[0].message.content
     m = re.search(r"```(?:python)?\n(.*?)```", raw, re.DOTALL)
     code = m.group(1) if m else raw.strip()
-    print("\n[code]\n" + code)
 
-    ns = {"df": df, "pd": pd}
+    # Coste (gpt-4.1-mini ene-2026: $0.40/1M input, $1.60/1M output, 0.93 USD/EUR)
+    cost_eur = (resp.usage.prompt_tokens * 0.40 + resp.usage.completion_tokens * 1.60) / 1_000_000 * 0.93
+
+    print(f"\n[code · {cost_eur*1000:.3f} m€]\n" + code)
+
+    ns = {"df": df, "pd": pd, "np": np}
     try:
         exec(code, ns)
         print("\n[result]\n" + str(ns.get("resultado", "(sin `resultado`)")))

@@ -189,11 +189,11 @@ client = get_openai_client()
 st.title("🤖 Cañadata — paso 4: clasificador clásico vs LLM zero-shot")
 st.caption(f"{len(df):,} leads · clasificador `{classifier['kind']}` · LLM `{MODEL}`")
 
-render_cost_sidebar()
-
 with st.sidebar:
     st.subheader("Selecciona un lead")
     lead_id = st.selectbox("lead_id", df["lead_id"].tolist())
+
+render_cost_sidebar()
 
 lead = df[df["lead_id"] == lead_id].iloc[0].to_dict()
 

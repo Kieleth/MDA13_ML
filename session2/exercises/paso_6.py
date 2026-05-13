@@ -196,11 +196,13 @@ SYSTEM_PROMPT_ANALISTA = (
 )
 
 
-def ask_llm_for_code(pregunta: str, system_prompt: str) -> tuple[str, float]:
+@st.cache_data(show_spinner=False)
+def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, float]:
+    """Cached por (pregunta, system_prompt). `_client` opta fuera del hash."""
     # ── HUECO 2 ────────────────────────────────────────────
     # Llama al LLM con system + user. Patrón (igual que paso_5
     # pero con system_prompt parametrizable):
-    #   response = client.chat.completions.create(
+    #   response = _client.chat.completions.create(
     #       model=MODEL,
     #       messages=[
     #           {"role": "system", "content": system_prompt},
@@ -277,7 +279,7 @@ pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
 
 if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.strip()):
     with st.spinner("LLM redactando código (modo operador)…"):
-        raw, cost = ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR)
+        raw, cost = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_OPERADOR)
         track_cost(f"paso6-op:{pregunta}", cost)
         code = extract_code(raw)
     with st.expander("👁 Código (operador)"):
@@ -295,23 +297,35 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
 
 # ── HUECO 3 ────────────────────────────────────────────────
 # Vista de comparación: corre la misma pregunta en MODO_ANALISTA y
-# en MODO_OPERADOR, lado a lado, y muestra ambos resultados.
+# en MODO_OPERADOR, lado a lado. **Muestra el código generado en
+# cada modo** (es lo que entrega el punchline: analista escribe
+# lookup en df, operador llama al modelo entrenado).
 #
 # Patrón:
 #   if st.button("Comparar modos", disabled=not pregunta.strip()):
 #       col_an, col_op = st.columns(2)
 #       with col_an:
-#           raw_an, cost_an = ask_llm_for_code(pregunta, SYSTEM_PROMPT_ANALISTA)
+#           st.markdown("### 🧮 Modo analista (sólo df)")
+#           raw_an, cost_an = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_ANALISTA)
 #           track_cost(f"p6-an:{pregunta}", cost_an)
 #           code_an = extract_code(raw_an)
+#           with st.expander("Código generado"):
+#               st.code(code_an, language="python")
 #           res_an, err_an = run_code(code_an, df, "analista")
-#           # render (con st.dataframe / st.write según tipo)
+#           if err_an: st.error(err_an)
+#           elif isinstance(res_an, (pd.DataFrame, pd.Series)):
+#               st.dataframe(res_an, use_container_width=True)
+#           else:
+#               st.write(res_an)
 #       with col_op:
-#           raw_op, cost_op = ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR)
+#           st.markdown("### 🧠 Modo operador (df + modelos)")
+#           raw_op, cost_op = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_OPERADOR)
 #           track_cost(f"p6-op:{pregunta}", cost_op)
 #           code_op = extract_code(raw_op)
+#           with st.expander("Código generado"):
+#               st.code(code_op, language="python")
 #           res_op, err_op = run_code(code_op, df, "operador")
-#           # render
+#           # render igual que arriba
 # ──────────────────────────────────────────────────────────
 ___
 
