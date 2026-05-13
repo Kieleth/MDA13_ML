@@ -267,7 +267,7 @@ st.markdown(
 - **Cambia el lead** y observa cuándo el LLM y el clasificador discrepan más. ¿Hay un patrón? Pista: prueba con leads cuya descripción es vaga o está en inglés.
 - **Mejora el prompt**: añade el contexto del negocio (precios, segmentos, qué hace que un lead sea bueno) y vuelve a comparar. ¿Mejora la correlación con el clasificador?
 - **Modo confianza**: pídele al LLM que devuelva además su nivel de confianza ("alta/media/baja") y muéstralo. Útil para discutir cuándo confiar en el zero-shot.
-- **Batch eval**: evalúa el LLM sobre 50 leads del holdout (`canadata_holdout.csv`) y compara su ROC-AUC con el del clasificador. Pista: ten cuidado con la tasa de llamadas (0.05 €/100 leads).
+- **Batch eval**: evalúa el LLM sobre 50 leads del holdout (`canadata_holdout.csv`) y compara su ROC-AUC con el del clasificador. Coste aproximado: ~0.004 € por 100 leads.
 - **Coste real**: `response.usage` te da los tokens. Calcula el coste por lead a precios actuales de gpt-4.1-mini.
 """
 )
