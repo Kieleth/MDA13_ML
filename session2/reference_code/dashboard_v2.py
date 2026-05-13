@@ -143,27 +143,41 @@ Devuelve SÓLO un bloque ```python ... ```, sin explicación."""
 
 
 SYSTEM_PROMPT_OPERADOR = """Eres un asistente con acceso a:
-  - `df`: DataFrame de leads de Cañadata (columnas: industry, company_size, country, source, demo_requested, emails_opened, response_time_hours, n_meetings, decision_maker_contacted, quoted_acv_eur, converted, ...).
-  - `classifier` (dict con 'model', 'feature_names'). Predice conversión sobre 1 lead así:
+  - `df`: DataFrame de leads de Cañadata. **`lead_id` es una COLUMNA, no el índice.** Para buscar un lead por id, usa: `df[df['lead_id'] == 'L0050'].iloc[0].to_dict()`.
+  - Columnas de df: lead_id, company_name, industry, company_size, country, source, signup_date, demo_requested, emails_opened, response_time_hours, n_meetings, decision_maker_contacted, quoted_acv_eur, company_description, converted, converted_within_days, lead_segment_truth.
+
+  - `classifier` (dict con 'model', 'feature_names'). Para predecir conversión sobre 1 lead:
         X = build_X(lead_dict, CLF_INPUT_COLS, classifier['feature_names'])
         proba = classifier['model'].predict_proba(X)[0, 1]
-  - `regressor` (igual estructura, target en log space; convierte con np.exp).
+  - `regressor` (target en log space; convierte con np.exp):
+        X = build_X(lead_dict, REG_INPUT_COLS, regressor['feature_names'])
+        acv = float(np.exp(regressor['model'].predict(X))[0])
   - `clusterer` (dict con 'model', 'scaler', 'feature_names'). Para 1 lead:
         Xs = clusterer['scaler'].transform(build_X(lead_dict, REG_INPUT_COLS, clusterer['feature_names']))
         cluster_id = clusterer['model'].predict(Xs)[0]
-  - `timeseries` (dict con 'model' (SARIMAX fit), 'history' (Series mensual)).
-        forecast = timeseries['model'].get_forecast(steps=N).predicted_mean
-  - `build_X(lead_dict, columns, training_features)` helper para construir features de 1 lead.
+  - `timeseries` (dict con 'model' (Prophet entrenado), 'history' (Series mensual)). Para forecast:
+        future = timeseries['model'].make_future_dataframe(periods=N, freq='MS')
+        fc = timeseries['model'].predict(future)
+        forecast = fc.set_index('ds')['yhat'].iloc[-N:]
+  - `build_X(lead_dict, columns, training_features)` helper.
   - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
 
+**IMPORTANTE — construcción de leads hipotéticos**:
+Si el usuario describe un lead hipotético sin todas las features, RELLENA LOS HUECOS con estos defaults razonables:
+    DEFAULTS = {
+        'industry': 'SaaS', 'company_size': 100, 'country': 'ES', 'source': 'organic',
+        'demo_requested': False, 'emails_opened': 5, 'response_time_hours': 24,
+        'n_meetings': 1, 'decision_maker_contacted': False, 'quoted_acv_eur': 5000.0
+    }
+    lead = {**DEFAULTS, **lo_que_el_usuario_dijo}
+
 Reglas:
-  - Para "¿qué probabilidad tiene este lead de convertir?" usa el clasificador entrenado.
-  - Para "¿cuál es la tasa de conversión por industria en los datos?" usa `df` directamente.
-  - Para predicción de ACV de un lead específico: regressor con np.exp.
-  - Para forecast temporal: timeseries.
-  - Para descubrir cluster de un lead: clusterer.
-  - Termina con `resultado = ...`.
-  - Devuelve SÓLO ```python ... ```, sin explicación."""
+  - Para "¿qué probabilidad tiene este lead?" usa el clasificador.
+  - Para "¿tasa de conversión por X en df?" usa df.
+  - Para predicción de ACV individual: regressor con np.exp.
+  - Para forecast temporal: timeseries con Prophet.
+  - Para cluster: clusterer con scaler.
+  - Termina con `resultado = ...`. Devuelve SÓLO ```python ... ```."""
 
 
 def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> str:
