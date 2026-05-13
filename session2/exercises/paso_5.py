@@ -131,14 +131,19 @@ SYSTEM_PROMPT = ___
 
 
 @st.cache_data(show_spinner=False)
-def ask_llm_for_code(_client, pregunta: str) -> tuple[str, float]:
-    """Cached por `pregunta`. `_client` con underscore opta fuera del hash."""
+def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, float]:
+    """Cached por (pregunta, system_prompt). `_client` con underscore opta fuera del hash.
+
+    Pasamos system_prompt como argumento explícito (en vez de leerlo del global)
+    para que la cache lo incluya. Si editas el prompt en vivo y vuelves a preguntar
+    lo mismo, queremos cache miss → llamada fresca → ver el efecto del cambio.
+    """
     # ── HUECO 2 ────────────────────────────────────────────
     # Llama al LLM con system + user. Patrón:
     #   response = _client.chat.completions.create(
     #       model=MODEL,
     #       messages=[
-    #           {"role": "system", "content": SYSTEM_PROMPT},
+    #           {"role": "system", "content": system_prompt},
     #           {"role": "user", "content": pregunta},
     #       ],
     #       temperature=0.0,   # código determinista
@@ -215,7 +220,7 @@ pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
 
 if st.button("Preguntar", type="primary", disabled=not pregunta.strip()):
     with st.spinner("LLM redactando código…"):
-        raw, cost = ask_llm_for_code(client, pregunta)
+        raw, cost = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT)
         track_cost(f"paso5:{pregunta}", cost)
         code = extract_code(raw)
 

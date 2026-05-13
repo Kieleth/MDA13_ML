@@ -18,7 +18,7 @@ from openai import OpenAI
 load_dotenv()
 
 
-# ── 1. CAMBIA ESTAS DOS LÍNEAS POR TU DATASET ─────────────────────────
+# ── 1. CAMBIA ESTAS DOS VARIABLES POR TU DATASET ──────────────────────
 csv_path = "tu_dataset.csv"
 column_hints = """
     customer_id (str), order_date (str YYYY-MM-DD), amount_eur (float),
