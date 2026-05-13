@@ -2,7 +2,25 @@
 
 S1 entrenaste herramientas. S2 las pusiste detrás de un LLM. Hoy mides si todo eso justifica su coste, montas puertas de calidad, y construyes el flujo entero del lunes ("entran 150 leads nuevos, ¿cómo redesplegamos?").
 
-## Antes de empezar
+## ⚠ Si en S2 te quedaste atascado, lee esto primero
+
+S3 hereda los conceptos de S2 (los 3 modos LLM: zero-shot, analista, operador) sin recap dentro de los pasos. Si no te quedó claro qué hace cada uno:
+
+- **Opción rápida (5 min)**: abre `session2/exercises/paso_6.py` y mira el `SYSTEM_PROMPT_OPERADOR` pre-escrito. Eso es lo que el LLM "ve" al actuar como operador.
+- **Opción visual (5 min)**: lanza `streamlit run session2/reference_code/dashboard_v2.py` y prueba la vista de comparación analista vs operador con la misma pregunta.
+- **Opción cero**: hoy el "LLM zero-shot" es lo único que vas a tocar contra `paso_7` (vs el clasificador clásico). Con eso te alcanza para empezar. Los otros 2 modos llegarán al final cuando lance `dashboard_v3.py` como reveal.
+
+## Conceptos que se asumen en S3 (warm-up rápido)
+
+Si alguno te suena flojo, expande el bloque "🧯 Warm-up: 5 conceptos en 10 minutos" al inicio de `paso_7.py`. Resumen aquí también:
+
+- **AUC**: probabilidad de que un par random (positivo, negativo) tenga el positivo con score más alto. 0.5 aleatorio, 1.0 perfecto. NO es accuracy.
+- **Train / test / holdout**: train para fit, test para iterar, holdout para el examen final honesto. Hoy estrenamos el holdout.
+- **Bootstrap**: 1000 remuestreos con reemplazo te dan un intervalo de confianza. Si los CIs de dos modelos se solapan, no puedes afirmar quién gana.
+- **Vectorización**: el clasificador procesa los 50 leads en 1 operación de matrices (~24 ms). El LLM hace 1 llamada HTTP por lead (~650 ms × 50). Por eso la diferencia de latencia es brutal.
+- **Unidades**: hoy mostramos coste en céntimos y € directamente. Si ves `m€` en algún sitio (vino de S2), es "milésimas de euro", NO millones.
+
+## Antes de empezar (branch hygiene)
 
 Si tienes cambios sin commitear de S2 en tu working tree (paso_4/5/6 con huecos rellenados), commitea o stashea antes de cambiar de rama:
 
@@ -83,4 +101,12 @@ Si no tienes un caso real en mente, usa el de Cañadata: 700 leads/mes con scori
 
 `reference_code/dashboard_v3.py` — el dashboard integrado con los 3 modos LLM + harness de comparación + ship-it pipeline. Lo lanza el profesor al final como reveal. Mira aquí si te bloqueas, pero después de intentar tú.
 
-**Si en S2 te quedaste atascado y los 3 modos LLM del dashboard te parecen magia**: abre primero `session2/exercises/paso_6.py` (versión simplificada del modo operador) o `session2/reference_code/dashboard_v2.py` (los 3 modos en una página). dashboard_v3 hereda S2 sin recap.
+## Para ver el deploy en vivo (paso_8 / paso_9)
+
+El swap atómico del `.pkl` y el reload del dashboard sólo se aprecian si tienes OTRA pestaña abierta con el dashboard ANTES del deploy. Antes de empezar paso_8/paso_9:
+
+```sh
+streamlit run session2/exercises/paso_6.py  # o reference_code/dashboard_v2.py
+```
+
+en una ventana de Chrome aparte. Tras el deploy en paso_8/9, refrescas esa pestaña y ves las predicciones nuevas sin reiniciar Streamlit.

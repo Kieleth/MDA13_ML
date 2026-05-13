@@ -67,6 +67,12 @@ st.caption(
     "Sube un CSV con leads nuevos → retrain con quality gates → "
     "deploy automático si pasan. El dashboard se actualiza sin reiniciar."
 )
+st.info(
+    "👀 **Para ver el deploy en vivo**: abre `streamlit run session2/exercises/paso_6.py` "
+    "(u otro dashboard) en OTRA pestaña ANTES de desplegar. El swap reescribe los `.pkl` y "
+    "esa otra pestaña los recargará cuando refresques. Toda la lección de 'sin reiniciar' "
+    "se aprecia con la pestaña paralela abierta."
+)
 
 
 # ── Helpers ────────────────────────────────────────────────
@@ -128,19 +134,19 @@ st.subheader("2. Sube un batch nuevo")
 # Streamlit tiene `st.file_uploader("...", type="csv")`. Cuando el
 # usuario sube un archivo, guárdalo como NEW_BATCH.
 #
-# ⚠ Cuidado: si machacas NEW_BATCH directamente, pierdes el batch
-# canónico que viene en el repo. Mejor backup antes:
-#
+# Patrón básico (3 líneas):
 #   uploaded = st.file_uploader("CSV de leads nuevos", type="csv")
 #   if uploaded is not None:
 #       NEW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-#       if NEW_BATCH.exists():
-#           # backup automático del batch anterior
-#           NEW_BATCH.rename(NEW_BATCH.with_suffix(".csv.bak"))
 #       NEW_BATCH.write_bytes(uploaded.getvalue())
-#       st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)} (anterior → .csv.bak)")
+#       st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)}")
+#
+# ⚠ Nota: NEW_BATCH apunta a `session3/new_data/canadata_next_batch.csv`,
+# que es el batch canónico que viene en el repo. Subir un archivo lo
+# machaca. Para clase es aceptable (siempre puedes `git checkout` del CSV);
+# en producción harías versionado por timestamp o storage separado.
 # ──────────────────────────────────────────────────────────
-_hueco(1, "st.file_uploader + backup del NEW_BATCH anterior antes de sobrescribir")
+_hueco(1, "st.file_uploader + NEW_BATCH.write_bytes(uploaded.getvalue())")
 
 # Si ya hay un batch, dale opción de mostrarlo
 if NEW_BATCH.exists():

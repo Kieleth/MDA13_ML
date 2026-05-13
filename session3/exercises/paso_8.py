@@ -141,6 +141,9 @@ batch_arg = ["--new-batch", str(NEW_BATCH)] if new_batch_present else []
 if not new_batch_present:
     st.info(f"No hay `{NEW_BATCH.relative_to(ROOT)}`. El retrain usará sólo el histórico.")
 
+# Guardamos el resultado del dry-run en st.session_state porque Streamlit
+# re-ejecuta el script entero en cada click. Una variable local desaparecería
+# al pulsar el botón de Deploy. session_state persiste entre re-runs.
 if "last_dry_run" not in st.session_state:
     st.session_state.last_dry_run = None
 
@@ -203,10 +206,16 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
 st.divider()
 st.subheader("Deploy real")
 st.caption(
-    "Política de gates: el modelo nuevo debe estar al **95% o mejor** del valor del modelo "
-    "desplegado actualmente, en cada métrica. ¿Por qué 95%? Tolera degradación pequeña por "
-    "ruido (no exigimos que el nuevo siempre supere al actual, eso bloquearía deploys legítimos), "
-    "pero rechaza un modelo claramente peor. Si quieres ser más estricto, sube el umbral en `retrain.py`."
+    "**Política de gates**: el modelo nuevo debe estar a 95% o mejor del previo. "
+    "Para métricas higher-is-better (AUC, ARI): nuevo ≥ 0.95 × previo. "
+    "Para lower-is-better (MAPE): nuevo ≤ 1.05 × previo. La asimetría tiene sentido: "
+    "ambas reglas dicen lo mismo, 'no degrades más de un 5%'. Tolera ruido sin bloquear "
+    "deploys legítimos pero rechaza un modelo claramente peor."
+)
+st.info(
+    "👀 **Para ver el deploy en vivo**: abre `streamlit run session2/exercises/paso_6.py` "
+    "(u otro dashboard) en OTRA pestaña ANTES de pulsar Deploy. El swap reescribe los `.pkl`; "
+    "esa otra pestaña sólo los recarga al refrescar tras `cache_resource.clear()`."
 )
 
 if st.session_state.last_dry_run is None:
@@ -225,8 +234,12 @@ else:
 
         if result.returncode == 0:
             st.success("✓ Deploy completado. Las cachés se limpian y el dashboard verá los modelos nuevos al refrescar.")
-            # Borrar caches para que la app vuelva a cargar los .pkl. Limpiamos
-            # cache_resource (modelos .pkl) y cache_data (CSV, flag JSON).
+            # Streamlit tiene DOS cachés:
+            #   @st.cache_resource → objetos persistentes (modelos .pkl, conexiones DB,
+            #                       cliente OpenAI). No se serializan.
+            #   @st.cache_data     → estructuras de datos (DataFrames, dicts, JSON).
+            #                       Se hashean y persisten entre re-runs.
+            # Limpiamos los dos: los .pkl están en cache_resource, el JSON flag en cache_data.
             st.cache_resource.clear()
             st.cache_data.clear()
             st.balloons()

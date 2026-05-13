@@ -138,9 +138,21 @@ class GateSpec:
 
 
 GATE_SPECS = {
+    # AUC 0.78 = baseline cómoda para holdout n~100. Tu primer modelo probablemente
+    # rondó 0.85-0.92 en S1 sobre 700 leads de train.
     "classifier_roc_auc": GateSpec("classifier_roc_auc", higher_is_better=True, baseline=0.78),
+    # R² log = el regresor entrena sobre log(ACV). 0.65 es razonable para datos
+    # ruidosos del mundo real.
     "regressor_r2_log":   GateSpec("regressor_r2_log",   higher_is_better=True, baseline=0.65),
+    # ARI = Adjusted Rand Index. Mide acuerdo entre los clusters predichos y el
+    # arquetipo plantado. 0.40 = acuerdo moderado, esperable en un k-means sobre
+    # features sintéticas.
     "clusterer_ari":      GateSpec("clusterer_ari",      higher_is_better=True, baseline=0.40),
+    # MAPE = Mean Absolute Percentage Error sobre el forecast mensual.
+    # 200 = forecast medio se desvía 200% del valor real (es alto, sí; el dataset
+    # mensual de Cañadata es muy ruidoso porque viene de agregar leads diarios).
+    # Lower is better; el gate dice "no peor que 200%". Si tu modelo sale en
+    # 350-400%, falla y aprende a no desplegar series-temporales pobres.
     "timeseries_mape":    GateSpec("timeseries_mape",    higher_is_better=False, baseline=200.0),
 }
 

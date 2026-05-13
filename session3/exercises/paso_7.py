@@ -155,6 +155,12 @@ CLF_INPUT_COLS = [
 
 
 def build_X(df_subset: pd.DataFrame, training_features: list[str]) -> pd.DataFrame:
+    # get_dummies = one-hot encoding: convierte "industry=fintech" en 5 columnas
+    # binarias (una por valor posible). Si en el holdout NO aparece "healthcare",
+    # la columna no se crea. reindex con fill_value=0 fuerza la matriz a tener
+    # las MISMAS columnas que vio el clasificador en training (en el mismo orden),
+    # rellenando con ceros las que falten. Sin esto, predict_proba peta por
+    # mismatch de features.
     X = pd.get_dummies(df_subset[CLF_INPUT_COLS], columns=["industry", "country", "source"])
     for col in ["demo_requested", "decision_maker_contacted"]:
         if col in X.columns:
@@ -195,6 +201,21 @@ client = get_openai_client()
 st.title("📊 Cañadata — paso 7: comparación honesta sobre el holdout")
 st.caption(f"{len(df)} leads en el holdout · clasificador `{classifier['kind']}` · LLM `{MODEL}`")
 
+with st.expander("🧯 Warm-up: 5 conceptos en 10 minutos (ábrelo si vienes de S2 con dudas)", expanded=False):
+    st.markdown("""
+**1. AUC vs accuracy.** Accuracy = "¿acerté esta predicción?" (pasa/falla por lead). AUC = "¿el modelo rankea mejor que aleatorio?" Mecánica: coges un par random (1 lead que convirtió, 1 que no). Si tu score para el positivo es más alto que el del negativo, ese par cuenta 1. AUC = promedio sobre todos los pares posibles. **0.5 = moneda; 1.0 = ranking perfecto; entre 0.5 y 1.0 = qué de bien rankeas, no qué de acertado.**
+
+**2. Train / test / holdout.** En S1 partiste el dataset: train (entrenas), test (evalúas durante desarrollo, ya lo viste). Hoy estrenamos **holdout** = un tercer split que NADIE ha tocado. Es el único test honesto de generalización: si tu modelo lo aprueba aquí, no es porque haya memorizado.
+
+**3. Bootstrap CI.** Con 20-100 leads, tu AUC podría ser suerte. Bootstrap: remuestreas 1000 veces los `n` leads con reemplazo (algunos repiten, otros no aparecen), calculas AUC en cada uno, y te quedas con el rango central 95% (percentiles 2.5 a 97.5). Eso es tu CI. **Si los CIs de dos modelos se solapan, no puedes decir que uno gana — la diferencia podría ser ruido.**
+
+**4. Vectorización.** El clasificador procesa los 50 leads en UNA operación de matrices (~24 ms total para todos). El LLM procesa un lead por llamada HTTP (~650 ms cada uno). Por lead: clf 0.5 ms vs LLM 650 ms (~1300×). Por batch: clf 24 ms vs LLM 33 s (~1300× también, porque el batch del LLM es secuencial). Cuando ves "30× más lento", es una versión amable; la realidad por lead es mucho peor.
+
+**5. Unidades de coste.** En paso_7 lo verás en céntimos y en € por 1000 leads. En S2 viste `m€` = milésimas de euro (NO millones, lo decía la "m" minúscula). 1 m€ = 0.001 €. Para no confundir, hoy ponemos céntimos y euros directos.
+
+**Si algo de esto no te cuadra, dilo en voz alta. No avances con el modelo mental flojo.**
+""")
+
 n = st.slider("Número de leads a evaluar", min_value=5, max_value=len(df), value=20, step=5)
 sample = df.head(n)
 
@@ -220,6 +241,10 @@ if st.button("Correr el harness", type="primary"):
     t_llm = time.time() - t0
     proba_llm = np.array(proba_llm)
 
+    # `converted` es la columna del holdout que dice si el lead firmó o no.
+    # En S1/S2 era una columna más del df; aquí cambia de papel: es la GROUND TRUTH
+    # contra la que evaluamos clf y LLM. La sacamos del holdout NO la calculamos,
+    # porque para 100 leads del histórico ya sabemos qué pasó.
     y_true = sample["converted"].astype(int).values
 
     # ── HUECO 2a + HUECO 2b ────────────────────────────────
@@ -287,7 +312,12 @@ if st.button("Correr el harness", type="primary"):
         f"{auc_llm:.3f}" if not np.isnan(auc_llm) else "n/d",
         help=f"95% CI: [{llm_lo:.3f}, {llm_hi:.3f}]" if not np.isnan(llm_lo) else None,
     )
-    c3.metric("Coste LLM total", f"{cost_eur*1000:.2f} m€", help="m€ = milésimas de euro. 1000 m€ = 1 €.")
+    cost_per_1000 = cost_eur * 1000 / n
+    c3.metric(
+        "Coste LLM total",
+        f"{cost_eur*100:.3f} céntimos",
+        help=f"= {cost_eur:.5f} € totales sobre {n} leads. Proyectado a 1000 leads: ~{cost_per_1000:.2f} €.",
+    )
     c4.metric("Latencia LLM media", f"{t_llm/n:.2f} s/lead")
 
     # Humildad estadística explícita
@@ -351,6 +381,12 @@ if st.button("Correr el harness", type="primary"):
     # Es el paso de "saber rankear" a "tomar la decisión de a quién llamar".
     st.divider()
     st.subheader("Mueve el threshold y mira qué pasa")
+    st.markdown(
+        "**El AUC mide cuánto SABE el modelo. El EV (expected value) mide cuánto te PAGA.** "
+        "AUC = saber rankear. EV = sumar el dinero que gano (las firmas reales) menos lo que gasto "
+        "(las llamadas que hago a TODOS los predichos como positivos, firmen o no). El threshold "
+        "convierte un score continuo en una decisión binaria: llamo si score ≥ corte."
+    )
 
     threshold = st.slider("Threshold de decisión", 0.0, 1.0, 0.5, 0.05)
 
@@ -384,8 +420,16 @@ if st.button("Correr el harness", type="primary"):
     # añadirlos restando `fn * gain_per_signing * prob_recuperacion` si
     # mides la probabilidad de re-engage.
     # ──────────────────────────────────────────────────────
-    gain_per_signing = 5_000   # € por firma
-    cost_per_call = 5          # € por llamada
+    # Economía del negocio (sliders: cambia los números y observa cómo se mueve el EV)
+    eco_col1, eco_col2 = st.columns(2)
+    gain_per_signing = eco_col1.slider(
+        "Ganancia por firma (€)", 500, 20_000, 5_000, 500,
+        help="Para Cañadata, ACV medio ~9000 €. Ajusta a tu negocio.",
+    )
+    cost_per_call = eco_col2.slider(
+        "Coste por llamada (€)", 1, 50, 5, 1,
+        help="Coste cargado del SDR + tiempo. Valor ilustrativo, ajusta a tu economía.",
+    )
     ev_clf = _hueco(4, "tp_clf * gain_per_signing - (tp_clf + fp_clf) * cost_per_call")
 
     # Mismo cálculo para el LLM (pre-rellenado para que veas el patrón)
@@ -399,22 +443,24 @@ if st.button("Correr el harness", type="primary"):
     e1.metric("EV clasificador", f"{ev_clf:,} €")
     e2.metric("EV LLM zero-shot", f"{ev_llm:,} €")
     st.caption(
-        f"Asumiendo {gain_per_signing}€ por firma y {cost_per_call}€ por llamada "
-        f"sobre los {n} leads del holdout. Mueve el slider hasta que el EV deje "
-        "de subir — ese threshold es el óptimo para esta economía. Si los costes "
-        "cambian, el threshold óptimo cambia. **El AUC mide el saber, el EV mide el cobrar.**"
+        f"Sobre los {n} leads del holdout con la economía de los sliders. Mueve el threshold "
+        "hasta que el EV deje de subir — ese corte es el óptimo para ESTOS números. Si los "
+        "costes cambian, el threshold óptimo cambia. Por eso el threshold no se decide a 0.5 "
+        "por defecto, se decide con la economía del caso."
     )
 
 
 st.divider()
 with st.expander("✅ Valores esperados (sanity check sobre 50 leads del holdout)"):
     st.markdown("""
+**Tolerancia: ±0.05 en AUCs, ±20% en costes y latencias.** Si te sales de ese rango, mira la consola por si pasó algo (rate limit, descripción vacía, etc.) y vuelve a correr. Si insiste, no es bug, es ruido del muestreo — recoge más leads.
+
 - **AUC clasificador**: ~0.91 (CI 95%: ~0.82-0.98).
 - **AUC LLM zero-shot**: ~0.69 (CI 95%: ~0.55-0.82).
 - **Solapamiento de CIs**: a n=50 los intervalos casi se tocan — no afirmes señal limpia. A n=100 se separan.
-- **Coste**: ~0.03 m€/lead. 50 leads ≈ 0.15 cent. 1000 leads ≈ 3 cent.
+- **Coste total**: ~0.15 céntimos para 50 leads (≈ 3 céntimos por 1000 leads).
 - **Latencia LLM**: ~650 ms/lead (1 llamada secuencial). Clf vectorizado: 24 ms para los 50.
-- **EV @ threshold 0.5** con 5000 €/firma y 5 €/llamada: clf gana al LLM por ~factor 5-10×.
+- **EV @ threshold 0.5** con 5000 €/firma y 5 €/llamada: clf gana al LLM por factor 5-10×.
 """)
 st.divider()
 st.subheader("🚀 Opcional: caminos para profundizar")
