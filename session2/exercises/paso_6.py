@@ -13,7 +13,7 @@
 # Aquí el LLM tiene acceso a TRES cosas:
 #   1. el DataFrame `df` (como antes)
 #   2. los modelos clásicos cargados (`classifier`, `regressor`,
-#      `clusterer`, `timeseries_model`, `build_X`)
+#      `clusterer`, `timeseries`, `build_X`)
 #   3. una guía sobre cómo usarlos
 #
 # Y termina con la VISTA DE COMPARACIÓN: misma pregunta, modo analista
@@ -21,15 +21,16 @@
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
-# CUATRO huecos marcados con `___`:
-#   - HUECO 1: SYSTEM_PROMPT enriquecido con los modelos disponibles
-#              y cómo invocarlos.
-#   - HUECO 2: el namespace de exec() incluye los modelos cargados
-#              (y la helper build_X).
-#   - HUECO 3: la llamada al LLM (igual que en paso_5).
-#   - HUECO 4: la vista de comparación: ejecuta la misma pregunta
-#              en MODO_ANALISTA y MODO_OPERADOR y muestra los dos
-#              resultados lado a lado.
+# El SYSTEM_PROMPT_OPERADOR viene PRE-ESCRITO (es donde está la
+# documentación de cada herramienta — léelo, no es la lección).
+# Tu trabajo son TRES huecos donde se ve la lección del paso:
+#
+#   - HUECO 1: el namespace de exec() incluye los modelos cargados
+#              y los helpers (esto es lo que diferencia analista
+#              de operador en runtime).
+#   - HUECO 2: la llamada al LLM con el system_prompt seleccionable.
+#   - HUECO 3: la vista de comparación: misma pregunta en MODO_ANALISTA
+#              y MODO_OPERADOR, lado a lado.
 #
 # ── Cómo ejecutar ──────────────────────────────────────────
 #
@@ -54,6 +55,25 @@ load_dotenv(ROOT / ".env")
 st.set_page_config(page_title="Cañadata — paso 6", page_icon="🧠", layout="wide")
 
 MODEL = "gpt-4.1-mini"
+# Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
+COST_IN = 0.40 / 1_000_000
+COST_OUT = 1.60 / 1_000_000
+USD_TO_EUR = 0.93
+
+
+def track_cost(key: str, cost_eur: float) -> None:
+    bag = st.session_state.setdefault("llm_call_costs", {})
+    bag[key] = cost_eur
+
+
+def render_cost_sidebar() -> None:
+    bag = st.session_state.get("llm_call_costs", {})
+    if not bag:
+        return
+    total = sum(bag.values())
+    with st.sidebar:
+        st.divider()
+        st.metric("💰 Coste LLM", f"{total*1000:.2f} m€", f"{len(bag)} llamadas únicas")
 
 
 # ── Carga ──────────────────────────────────────────────────
@@ -119,38 +139,49 @@ timeseries = load_timeseries()
 client = get_openai_client()
 
 
-# ── HUECO 1 ────────────────────────────────────────────────
-# El SYSTEM_PROMPT del modo OPERADOR. Tiene que decirle al LLM:
-#   - que es un asistente con acceso a `df` Y a 4 modelos entrenados,
-#   - cómo invocar cada modelo,
-#   - cuándo usar `df` puro vs cuándo usar los modelos entrenados,
-#   - que el código debe terminar con `resultado = ...`.
-#
-# Plantilla:
-# """Eres un analista que tiene acceso a:
-#   - `df` (DataFrame de Cañadata, columnas: ...)
-#   - `classifier` (dict con keys 'model', 'feature_names'). Para
-#     predecir conversión sobre 1 lead:
-#         X = build_X(lead_dict, CLF_INPUT_COLS, classifier['feature_names'])
-#         proba = classifier['model'].predict_proba(X)[0, 1]
-#   - `regressor` (igual estructura, target en log space; recuerda np.exp).
-#   - `clusterer` (dict con 'model', 'scaler', 'feature_names').
-#   - `timeseries` (dict con 'model' (Prophet entrenado), 'history' (Series mensual),
-#     'validation_mape'). Para forecast:
-#         future = timeseries['model'].make_future_dataframe(periods=N, freq='MS')
-#         fc = timeseries['model'].predict(future)
-#         forecast = fc.set_index('ds')['yhat'].iloc[-N:]
-#   - `build_X(lead_dict, columns, training_features)` helper.
-#   - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
-#
-# Reglas:
-#   - Para "¿qué probabilidad tiene este lead de convertir?" usa el clasificador.
-#   - Para "¿cuál es la tasa de conversión por industria?" usa `df`.
-#   - Para forecast usa timeseries.
-#   - Termina con `resultado = ...`.
-#   - Devuelve SÓLO ```python ... ```."""
+# ── SYSTEM_PROMPT_OPERADOR (PRE-ESCRITO — léelo, no es la lección) ────
+# El prompt vive aquí, completo, porque escribir un buen system prompt
+# es un oficio largo: documentación de cada herramienta + reglas de
+# enrutado + defaults para inputs incompletos. La lección de paso_6 está
+# en el NAMESPACE (HUECO 1) y en la COMPARACIÓN (HUECO 3): lo que cambia
+# entre analista y operador es lo que está disponible en runtime.
 # ──────────────────────────────────────────────────────────
-SYSTEM_PROMPT_OPERADOR = ___
+SYSTEM_PROMPT_OPERADOR = """Eres un asistente con acceso a:
+  - `df`: DataFrame de leads de Cañadata. **`lead_id` es una COLUMNA, no el índice.** Para buscar un lead por id, usa: `df[df['lead_id'] == 'L0050'].iloc[0].to_dict()`.
+  - Columnas de df: lead_id, company_name, industry, company_size, country, source, signup_date, demo_requested, emails_opened, response_time_hours, n_meetings, decision_maker_contacted, quoted_acv_eur, company_description, converted, converted_within_days, lead_segment_truth.
+
+  - `classifier` (dict con 'model', 'feature_names'). Para predecir conversión sobre 1 lead:
+        X = build_X(lead_dict, CLF_INPUT_COLS, classifier['feature_names'])
+        proba = classifier['model'].predict_proba(X)[0, 1]
+  - `regressor` (target en log space; convierte con np.exp):
+        X = build_X(lead_dict, REG_INPUT_COLS, regressor['feature_names'])
+        acv = float(np.exp(regressor['model'].predict(X))[0])
+  - `clusterer` (dict con 'model', 'scaler', 'feature_names'). Para 1 lead:
+        Xs = clusterer['scaler'].transform(build_X(lead_dict, REG_INPUT_COLS, clusterer['feature_names']))
+        cluster_id = clusterer['model'].predict(Xs)[0]
+  - `timeseries` (dict con 'model' (Prophet entrenado), 'history' (Series mensual)). Para forecast:
+        future = timeseries['model'].make_future_dataframe(periods=N, freq='MS')
+        fc = timeseries['model'].predict(future)
+        forecast = fc.set_index('ds')['yhat'].iloc[-N:]
+  - `build_X(lead_dict, columns, training_features)` helper.
+  - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
+
+**IMPORTANTE — construcción de leads hipotéticos**:
+Si el usuario describe un lead hipotético sin todas las features, RELLENA LOS HUECOS con estos defaults razonables:
+    DEFAULTS = {
+        'industry': 'SaaS', 'company_size': 100, 'country': 'ES', 'source': 'organic',
+        'demo_requested': False, 'emails_opened': 5, 'response_time_hours': 24,
+        'n_meetings': 1, 'decision_maker_contacted': False, 'quoted_acv_eur': 5000.0
+    }
+    lead = {**DEFAULTS, **lo_que_el_usuario_dijo}
+
+Reglas:
+  - Para "¿qué probabilidad tiene este lead?" usa el clasificador.
+  - Para "¿tasa de conversión por X en df?" usa df.
+  - Para predicción de ACV individual: regressor con np.exp.
+  - Para forecast temporal: timeseries con Prophet.
+  - Para cluster: clusterer con scaler.
+  - Termina con `resultado = ...`. Devuelve SÓLO ```python ... ```."""
 
 
 # Mismo prompt simplificado para el modo ANALISTA (sólo `df`, sin modelos)
@@ -165,12 +196,24 @@ SYSTEM_PROMPT_ANALISTA = (
 )
 
 
-def ask_llm_for_code(pregunta: str, system_prompt: str) -> str:
-    # ── HUECO 3 ────────────────────────────────────────────
-    # Llama al LLM con system + user. Igual que paso_5.
+def ask_llm_for_code(pregunta: str, system_prompt: str) -> tuple[str, float]:
+    # ── HUECO 2 ────────────────────────────────────────────
+    # Llama al LLM con system + user. Patrón (igual que paso_5
+    # pero con system_prompt parametrizable):
+    #   response = client.chat.completions.create(
+    #       model=MODEL,
+    #       messages=[
+    #           {"role": "system", "content": system_prompt},
+    #           {"role": "user", "content": pregunta},
+    #       ],
+    #       temperature=0.0,
+    #   )
     # ──────────────────────────────────────────────────────
-    text = ___
-    return text
+    response = ___
+
+    cost = (response.usage.prompt_tokens * COST_IN
+            + response.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    return response.choices[0].message.content, cost
 
 
 def extract_code(text: str) -> str:
@@ -178,9 +221,13 @@ def extract_code(text: str) -> str:
     return match.group(1) if match else text.strip()
 
 
-def run_code(code: str, mode: str):
-    """Ejecuta `code` en un namespace que depende del modo."""
-    # ── HUECO 2 ────────────────────────────────────────────
+def run_code(code: str, df: pd.DataFrame, mode: str):
+    """Ejecuta `code` en un namespace que depende del modo.
+
+    AQUÍ ESTÁ LA LECCIÓN DE paso_6: lo que cambia entre analista y
+    operador es exactamente qué objetos viven en el namespace de exec().
+    """
+    # ── HUECO 1 ────────────────────────────────────────────
     # En modo "analista": ns = {"df": df, "pd": pd, "np": np}
     # En modo "operador": añade al ns: classifier, regressor, clusterer,
     #     timeseries, build_X, CLF_INPUT_COLS, REG_INPUT_COLS.
@@ -201,6 +248,8 @@ st.title("🧠 Cañadata — paso 6: LLM operador del modelo entrenado")
 st.caption(
     f"{len(df):,} leads · 4 modelos clásicos disponibles · modelo LLM `{MODEL}`"
 )
+
+render_cost_sidebar()
 
 st.subheader("Hazle una pregunta")
 st.caption(
@@ -228,11 +277,12 @@ pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
 
 if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.strip()):
     with st.spinner("LLM redactando código (modo operador)…"):
-        raw = ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR)
+        raw, cost = ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR)
+        track_cost(f"paso6-op:{pregunta}", cost)
         code = extract_code(raw)
     with st.expander("👁 Código (operador)"):
         st.code(code, language="python")
-    resultado, error = run_code(code, "operador")
+    resultado, error = run_code(code, df, "operador")
     if error:
         st.error(f"Error: {error}")
     else:
@@ -243,7 +293,7 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
             st.write(resultado)
 
 
-# ── HUECO 4 ────────────────────────────────────────────────
+# ── HUECO 3 ────────────────────────────────────────────────
 # Vista de comparación: corre la misma pregunta en MODO_ANALISTA y
 # en MODO_OPERADOR, lado a lado, y muestra ambos resultados.
 #
@@ -251,17 +301,29 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
 #   if st.button("Comparar modos", disabled=not pregunta.strip()):
 #       col_an, col_op = st.columns(2)
 #       with col_an:
-#           st.markdown("### Modo analista (sólo df)")
-#           code_an = extract_code(ask_llm_for_code(pregunta, SYSTEM_PROMPT_ANALISTA))
-#           res_an, err_an = run_code(code_an, "analista")
-#           # render
+#           raw_an, cost_an = ask_llm_for_code(pregunta, SYSTEM_PROMPT_ANALISTA)
+#           track_cost(f"p6-an:{pregunta}", cost_an)
+#           code_an = extract_code(raw_an)
+#           res_an, err_an = run_code(code_an, df, "analista")
+#           # render (con st.dataframe / st.write según tipo)
 #       with col_op:
-#           st.markdown("### Modo operador (df + modelos)")
-#           code_op = extract_code(ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR))
-#           res_op, err_op = run_code(code_op, "operador")
+#           raw_op, cost_op = ask_llm_for_code(pregunta, SYSTEM_PROMPT_OPERADOR)
+#           track_cost(f"p6-op:{pregunta}", cost_op)
+#           code_op = extract_code(raw_op)
+#           res_op, err_op = run_code(code_op, df, "operador")
 #           # render
 # ──────────────────────────────────────────────────────────
 ___
+
+
+# ── Cierre: puente a S3 (el jueves) ────────────────────────
+st.divider()
+st.info(
+    "**El jueves en S3 (paso_7)**: medimos clf-vs-LLM-zero-shot-vs-LLM-operador "
+    "sobre el holdout (100 leads que nadie ha visto), con ROC-AUC, intervalos de "
+    "confianza por bootstrap, coste y latencia. Hoy es cualitativo; mañana es "
+    "cuantitativo."
+)
 
 
 st.divider()
