@@ -327,7 +327,7 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
 #           res_op, err_op = run_code(code_op, df, "operador")
 #           # render igual que arriba
 # ──────────────────────────────────────────────────────────
-___
+st.info("👉 HUECO 3 pendiente: sustituye esta línea por la vista de comparación (sigue el patrón de la pista de arriba).")
 
 
 # ── Cierre: puente a S3 (el jueves) ────────────────────────

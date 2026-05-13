@@ -38,6 +38,25 @@ load_dotenv(ROOT / ".env")
 st.set_page_config(page_title="Cañadata — S2", page_icon="🧠", layout="wide")
 
 MODEL = "gpt-4.1-mini"
+# Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
+COST_IN = 0.40 / 1_000_000
+COST_OUT = 1.60 / 1_000_000
+USD_TO_EUR = 0.93
+
+
+def track_cost(key: str, cost_eur: float) -> None:
+    bag = st.session_state.setdefault("llm_call_costs", {})
+    bag[key] = cost_eur
+
+
+def render_cost_sidebar() -> None:
+    bag = st.session_state.get("llm_call_costs", {})
+    if not bag:
+        return
+    total = sum(bag.values())
+    with st.sidebar:
+        st.divider()
+        st.metric("💰 Coste LLM", f"{total*1000:.2f} m€", f"{len(bag)} llamadas únicas")
 
 
 # ── Carga ──────────────────────────────────────────────────
@@ -121,7 +140,7 @@ def build_scoring_prompt(description: str) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def llm_score_lead(_client, lead_id: str, description: str) -> int:
+def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]:
     resp = _client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": build_scoring_prompt(description)}],
@@ -130,7 +149,10 @@ def llm_score_lead(_client, lead_id: str, description: str) -> int:
     )
     text = resp.choices[0].message.content.strip()
     m = re.search(r"\d+", text)
-    return int(m.group(0)) if m else -1
+    score = int(m.group(0)) if m else -1
+    cost = (resp.usage.prompt_tokens * COST_IN
+            + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    return score, cost
 
 
 SYSTEM_PROMPT_ANALISTA = """Eres un analista de datos. Tienes un DataFrame de pandas llamado `df` con datos de leads B2B (Cañadata).
@@ -180,7 +202,8 @@ Reglas:
   - Termina con `resultado = ...`. Devuelve SÓLO ```python ... ```."""
 
 
-def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> str:
+@st.cache_data(show_spinner=False)
+def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, float]:
     resp = _client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -189,7 +212,9 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> str:
         ],
         temperature=0.0,
     )
-    return resp.choices[0].message.content
+    cost = (resp.usage.prompt_tokens * COST_IN
+            + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    return resp.choices[0].message.content, cost
 
 
 def extract_code(text: str) -> str:
@@ -239,6 +264,8 @@ with st.sidebar:
     st.subheader("Forecast")
     forecast_months = st.slider("Meses", 1, 12, 6)
 
+render_cost_sidebar()
+
 lead = df[df["lead_id"] == lead_id].iloc[0].to_dict()
 
 # Lead summary
@@ -281,7 +308,8 @@ with col_llm:
     st.subheader("🤖 LLM zero-shot")
     if isinstance(desc, str) and desc.strip():
         with st.spinner("LLM…"):
-            score = llm_score_lead(client, lead_id, desc)
+            score, cost_zs = llm_score_lead(client, lead_id, desc)
+        track_cost(f"v2-score:{lead_id}", cost_zs)
         proba_llm = score / 100.0 if score >= 0 else None
         st.metric("P(convertir)", f"{score}%" if score >= 0 else "n/d")
         st.caption("Sólo lee `company_description`.")
@@ -341,7 +369,8 @@ do_compare = cta_b.button("Comparar modos", disabled=not pregunta.strip())
 if do_run:
     sys_prompt = SYSTEM_PROMPT_OPERADOR if modo == "operador" else SYSTEM_PROMPT_ANALISTA
     with st.spinner(f"LLM (modo {modo})…"):
-        raw = ask_llm_for_code(client, pregunta, sys_prompt)
+        raw, cost = ask_llm_for_code(client, pregunta, sys_prompt)
+        track_cost(f"v2-chat-{modo}:{pregunta}", cost)
         code = extract_code(raw)
     with st.expander(f"Código generado ({modo})"):
         st.code(code, language="python")
@@ -364,11 +393,12 @@ if do_compare:
         with col:
             st.markdown(f"### {name}")
             with st.spinner("…"):
-                raw = ask_llm_for_code(client, pregunta, sys_p)
+                raw, cost = ask_llm_for_code(client, pregunta, sys_p)
                 code = extract_code(raw)
+            mode_key = "analista" if "analista" in name.lower() else "operador"
+            track_cost(f"v2-cmp-{mode_key}:{pregunta}", cost)
             with st.expander("Código"):
                 st.code(code, language="python")
-            mode_key = "analista" if "analista" in name.lower() else "operador"
             res, err = run_code(code, df, mode_key)
             if err:
                 st.error(err)
