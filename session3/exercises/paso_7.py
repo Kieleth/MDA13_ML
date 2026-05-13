@@ -44,7 +44,12 @@
 import os
 import re
 import time
+import warnings
 from pathlib import Path
+
+# Los .pkl se pickleron con sklearn 1.8; si tienes una versión menor, sklearn
+# avisa pero los modelos funcionan bien. Silenciamos el ruido.
+warnings.filterwarnings("ignore", message="Trying to unpickle estimator.*")
 
 import joblib
 import numpy as np
@@ -59,6 +64,33 @@ load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="Cañadata — paso 7", page_icon="📊", layout="wide")
 MODEL = "gpt-4.1-mini"
+
+
+def _preflight() -> None:
+    """Falla loud si datos o .pkl de S1 faltan."""
+    holdout_path = ROOT / "data" / "canadata_holdout.csv"
+    if not holdout_path.exists():
+        st.error(
+            f"Falta `{holdout_path.relative_to(ROOT)}`. Lo necesitamos para el harness."
+        )
+        st.stop()
+    clf_path = ROOT / "session1" / "models" / "classifier.pkl"
+    if not clf_path.exists():
+        st.error(
+            f"Falta `{clf_path.relative_to(ROOT)}`. Corre `pre_class/1_classical_models.ipynb`."
+        )
+        st.stop()
+
+
+_preflight()
+
+
+# ── Sentinel para huecos sin rellenar ────────────────────
+# Muestra warning friendly y para la app limpio. Los componentes
+# de arriba ya han renderizado; los de abajo no, hasta que rellenes.
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
 
 
 # ── Carga ──────────────────────────────────────────────────
@@ -103,7 +135,16 @@ def get_openai_client():
     if not key:
         st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz.")
         st.stop()
-    return OpenAI(api_key=key)
+    client = OpenAI(api_key=key, timeout=10.0)
+    try:
+        client.models.list()
+    except Exception as e:
+        st.error(
+            f"No se pudo contactar OpenAI: `{type(e).__name__}`. "
+            f"Verifica red + que la API key es válida.\n\nDetalle: {e}"
+        )
+        st.stop()
+    return client
 
 
 CLF_INPUT_COLS = [
@@ -126,7 +167,7 @@ def build_X(df_subset: pd.DataFrame, training_features: list[str]) -> pd.DataFra
 # Lo necesitamos aquí porque vamos a llamarlo 1 vez por lead.
 # ──────────────────────────────────────────────────────────
 def build_scoring_prompt(description: str) -> str:
-    return ___
+    return _hueco(1, "réplica del prompt zero-shot de paso_4 (rol + tarea + descripción)")
 
 
 @st.cache_data(show_spinner=False)
@@ -189,8 +230,8 @@ if st.button("Correr el harness", type="primary"):
     #   from sklearn.metrics import roc_auc_score
     #   auc_clf = roc_auc_score(y_true, proba_clf) if len(set(y_true)) > 1 else float("nan")
     # ──────────────────────────────────────────────────────
-    auc_clf = ___
-    auc_llm = ___
+    auc_clf = _hueco(2, "roc_auc_score(y_true, proba_clf) con fallback a NaN si len(set(y_true)) < 2")
+    auc_llm = _hueco(2, "roc_auc_score(y_true, proba_llm) con el mismo guard")
 
     # ── Bootstrap CI (humildad estadística) ─────────────────
     #
@@ -269,7 +310,7 @@ if st.button("Correr el harness", type="primary"):
     #   }, index=["ROC-AUC"])
     #   st.bar_chart(chart_df, height=200)
     # ──────────────────────────────────────────────────────
-    ___
+    _hueco(3, "st.bar_chart con un DataFrame de 1 fila comparando AUCs")
 
     # Tabla detallada (siempre útil)
     st.subheader("Detalle lead a lead")
@@ -320,7 +361,7 @@ if st.button("Correr el harness", type="primary"):
     # ──────────────────────────────────────────────────────
     gain_per_signing = 5_000   # € por firma
     cost_per_call = 5          # € por llamada
-    ev_clf = ___
+    ev_clf = _hueco(4, "tp_clf * gain_per_signing - (tp_clf + fp_clf) * cost_per_call")
 
     # Mismo cálculo para el LLM (pre-rellenado para que veas el patrón)
     pred_llm = proba_llm >= threshold

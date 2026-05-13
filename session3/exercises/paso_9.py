@@ -37,7 +37,10 @@ import re
 import shutil
 import subprocess
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message="Trying to unpickle estimator.*")
 
 import joblib
 import numpy as np
@@ -51,6 +54,13 @@ NEW_BATCH = NEW_DATA_DIR / "canadata_next_batch.csv"
 FLAG = ROOT / "session1" / "models" / "_retrained_at.json"
 
 st.set_page_config(page_title="Cañadata — paso 9", page_icon="🚀", layout="wide")
+
+
+# ── Sentinel para huecos sin rellenar ────────────────────
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
+
 
 st.title("🚀 Cañadata — paso 9: ship it")
 st.caption(
@@ -124,7 +134,7 @@ st.subheader("2. Sube un batch nuevo")
 #       NEW_BATCH.write_bytes(uploaded.getvalue())
 #       st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)}")
 # ──────────────────────────────────────────────────────────
-___
+_hueco(1, "st.file_uploader y guardar bytes en NEW_BATCH (5-6 líneas)")
 
 # Si ya hay un batch, dale opción de mostrarlo
 if NEW_BATCH.exists():
@@ -152,7 +162,7 @@ if st.button("Reentrenar (dry-run)", type="primary"):
         # Llama a run_retrain(dry_run=True, batch_path=batch_for_retrain).
         # Guárdalo en `result`.
         # ──────────────────────────────────────────────────
-        result = ___
+        result = _hueco(2, "run_retrain(dry_run=True, batch_path=batch_for_retrain)")
     rows = parse_gates(result.stdout)
     st.session_state.ship_dry = {
         "rows": rows,
@@ -191,7 +201,7 @@ else:
             # ── HUECO 3 ────────────────────────────────────
             # Igual que HUECO 2 pero `dry_run=False`. Esto SI hace swap.
             # ──────────────────────────────────────────────
-            result = ___
+            result = _hueco(3, "run_retrain(dry_run=False, batch_path=batch_for_retrain)")
         if result.returncode == 0:
             st.success("✓ Deploy hecho. Refrescando modelos…")
 
@@ -202,7 +212,7 @@ else:
             #   st.cache_data.clear()
             # Y luego recarga la página: st.rerun() (Streamlit ≥1.27).
             # ──────────────────────────────────────────────
-            ___
+            _hueco(4, "st.cache_resource.clear() + st.cache_data.clear() + st.rerun()")
         else:
             st.error("Falló el deploy:")
             st.code(result.stdout, language="text")
@@ -221,7 +231,7 @@ st.subheader("5. Antes vs después")
 #
 # Si no hay "antes" (primer deploy), muestra sólo los actuales.
 # ──────────────────────────────────────────────────────────
-___
+_hueco(5, "tabla comparativa antes/después leyendo flag y session_state.ship_dry")
 
 
 st.divider()

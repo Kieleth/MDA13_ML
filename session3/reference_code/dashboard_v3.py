@@ -24,7 +24,10 @@ import re
 import subprocess
 import sys
 import time
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message="Trying to unpickle estimator.*")
 
 import joblib
 import numpy as np

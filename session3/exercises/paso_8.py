@@ -33,7 +33,10 @@
 import json
 import subprocess
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message="Trying to unpickle estimator.*")
 
 import streamlit as st
 
@@ -43,6 +46,13 @@ FLAG = ROOT / "session1" / "models" / "_retrained_at.json"
 NEW_BATCH = ROOT / "session3" / "new_data" / "canadata_next_batch.csv"
 
 st.set_page_config(page_title="Cañadata — paso 8", page_icon="🚦", layout="wide")
+
+
+# ── Sentinel para huecos sin rellenar ────────────────────
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
+
 
 st.title("🚦 Cañadata — paso 8: quality gates antes de desplegar")
 st.caption("Antes de cambiar los modelos en producción, exigimos que pasen umbrales mínimos.")
@@ -58,7 +68,7 @@ st.caption("Antes de cambiar los modelos en producción, exigimos que pasen umbr
 #   return None
 # ──────────────────────────────────────────────────────────
 def load_last_training_flag() -> dict | None:
-    return ___
+    return _hueco(1, "lee FLAG (json) si existe, devuelve dict o None")
 
 
 flag = load_last_training_flag()
@@ -121,7 +131,7 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
         # Argumentos: [sys.executable, str(RETRAIN), "--dry-run", *batch_arg]
         # Captura stdout y stderr (capture_output=True, text=True), cwd=ROOT.
         # ──────────────────────────────────────────────────
-        result = ___
+        result = _hueco(2, "subprocess.run con [sys.executable, str(RETRAIN), '--dry-run', *batch_arg]")
 
     if result.returncode != 0:
         st.error("Algunos gates fallaron. No se haría swap si esto fuera un deploy real.")
@@ -149,7 +159,7 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
     # Construye una lista de dicts {"métrica","valor","comparador","ok"}.
     # ──────────────────────────────────────────────────────
     import re
-    rows = ___
+    rows = _hueco(3, "re.findall + list comprehension para extraer (flag, métrica, valor, comparador) de stdout")
 
     if rows:
         import pandas as pd
@@ -173,7 +183,7 @@ else:
             # Igual que el HUECO 2 pero SIN --dry-run.
             # Captura stdout, parsea con la misma lógica, anuncia éxito.
             # ──────────────────────────────────────────────
-            result = ___
+            result = _hueco(4, "subprocess.run igual que HUECO 2 pero SIN --dry-run")
 
         if result.returncode == 0:
             st.success("✓ Deploy completado. Recarga el dashboard para ver los nuevos modelos.")
