@@ -38,7 +38,9 @@ El taller compara los tres en cuatro tareas distintas (clasificación, regresió
 
 ### `data/canadata_leads.csv`
 
-Tabla principal. 700 filas, una por lead. (Hay además un `canadata_holdout.csv` de 100 filas que se reserva para la comparación LLM-vs-clásico.)
+Tabla principal. ~700 filas, una por lead. (Hay además un `canadata_holdout.csv` de 100 filas que se reserva para la comparación LLM-vs-clásico.)
+
+> **Nota**: el warm-up de pre-clase (`pre_class/1_classical_models.ipynb`) limpia este fichero (normaliza casos categóricos, filtra outliers, dropea duplicados) y produce `data/canadata_leads_clean.csv` (~697 filas). **Es el fichero que cargan todos los `paso_*.py`**. Si abres uno de los dos a mano, el "clean" es el que ven los ejercicios.
 
 | Columna | Descripción |
 |---------|-------------|
@@ -67,7 +69,7 @@ Tabla principal. 700 filas, una por lead. (Hay además un `canadata_holdout.csv`
 | Clasificación | `converted` | xgboost / RandomForest |
 | Regresión | `quoted_acv_eur` | RandomForest sobre log-target |
 | Clustering | recuperar `lead_segment_truth` | KMeans (k=3) + StandardScaler |
-| Series temporales | conversiones mensuales | SARIMAX(1,1,1)(1,1,1,12) |
+| Series temporales | conversiones mensuales | Prophet (yearly_seasonality=True) |
 
 `company_description` está pensada para el modo LLM zero-shot. El clásico usa las features estructuradas; el LLM se las apaña con el texto.
 

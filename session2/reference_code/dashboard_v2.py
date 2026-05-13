@@ -37,7 +37,68 @@ load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="Cañadata — S2", page_icon="🧠", layout="wide")
 
+
+def _preflight() -> None:
+    """Falla loud si datos o .pkl de S1 faltan o tienen shape rota."""
+    csv_path = ROOT / "data" / "canadata_leads_clean.csv"
+    if not csv_path.exists():
+        st.error(
+            f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+            f"(`pre_class/1_classical_models.ipynb`) — lo genera al limpiar."
+        )
+        st.stop()
+    expected = {
+        "classifier.pkl": {"model", "feature_names"},
+        "regressor.pkl": {"model", "feature_names"},
+        "clusterer.pkl": {"model", "scaler", "feature_names"},
+        "timeseries.pkl": {"model", "history"},
+    }
+    models_dir = ROOT / "session1" / "models"
+    for fname, expected_keys in expected.items():
+        path = models_dir / fname
+        if not path.exists():
+            st.error(
+                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+                f"(`pre_class/1_classical_models.ipynb`) para regenerarlo."
+            )
+            st.stop()
+        try:
+            obj = joblib.load(path)
+        except Exception as e:
+            st.error(f"No se pudo cargar `{fname}`: {e}. Re-genera con el notebook de pre-clase.")
+            st.stop()
+        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
+            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
+            st.error(
+                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, "
+                f"encontradas: {keys_found}."
+            )
+            st.stop()
+
+
+_preflight()
+
+
 MODEL = "gpt-4.1-mini"
+# Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
+COST_IN = 0.40 / 1_000_000
+COST_OUT = 1.60 / 1_000_000
+USD_TO_EUR = 0.93
+
+
+def track_cost(key: str, cost_eur: float) -> None:
+    bag = st.session_state.setdefault("llm_call_costs", {})
+    bag[key] = cost_eur
+
+
+def render_cost_sidebar() -> None:
+    bag = st.session_state.get("llm_call_costs", {})
+    if not bag:
+        return
+    total = sum(bag.values())
+    with st.sidebar:
+        st.divider()
+        st.metric("💰 Coste LLM", f"{total*1000:.2f} m€", f"{len(bag)} llamadas únicas")
 
 
 # ── Carga ──────────────────────────────────────────────────
@@ -73,7 +134,16 @@ def get_openai_client() -> OpenAI:
     if not api_key:
         st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz.")
         st.stop()
-    return OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=10.0)
+    try:
+        client.models.list()
+    except Exception as e:
+        st.error(
+            f"No se pudo contactar OpenAI: `{type(e).__name__}`. "
+            f"Verifica red + que la API key es válida.\n\nDetalle: {e}"
+        )
+        st.stop()
+    return client
 
 
 # ── Helpers ────────────────────────────────────────────────
@@ -121,7 +191,7 @@ def build_scoring_prompt(description: str) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def llm_score_lead(_client, lead_id: str, description: str) -> int:
+def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]:
     resp = _client.chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": build_scoring_prompt(description)}],
@@ -130,12 +200,17 @@ def llm_score_lead(_client, lead_id: str, description: str) -> int:
     )
     text = resp.choices[0].message.content.strip()
     m = re.search(r"\d+", text)
-    return int(m.group(0)) if m else -1
+    score = int(m.group(0)) if m else -1
+    cost = (resp.usage.prompt_tokens * COST_IN
+            + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    return score, cost
 
 
 SYSTEM_PROMPT_ANALISTA = """Eres un analista de datos. Tienes un DataFrame de pandas llamado `df` con datos de leads B2B (Cañadata).
 
-Columnas: lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech, retail, logistics, healthcare, unknown}), company_size (int), country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), signup_date (str YYYY-MM-DD), source (str ∈ {organic, paid, referral, conference, outbound, unknown}), demo_requested (bool), emails_opened (int), response_time_hours (float), n_meetings (int), decision_maker_contacted (bool), quoted_acv_eur (float), company_description (str), converted (bool), converted_within_days (float, NaN si no convirtió), lead_segment_truth (str, USA SÓLO PARA EVALUAR, no como feature).
+Columnas: lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech, retail, logistics, healthcare, unknown}), company_size (int), country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), source (str ∈ {organic, paid, referral, conference, outbound}), demo_requested (bool), emails_opened (float), response_time_hours (float), n_meetings (int), decision_maker_contacted (bool), quoted_acv_eur (float), company_description (str), converted (bool), converted_within_days (float, NaN si no convirtió), lead_segment_truth (str, USA SÓLO PARA EVALUAR, no como feature).
+
+**`lead_id` es una COLUMNA, no el índice.** Para buscar un lead por id: `df[df['lead_id'] == 'L0050'].iloc[0].to_dict()`.
 
 Genera código Python pandas para responder la pregunta del usuario.
 Termina asignando el resultado a una variable llamada `resultado`.
@@ -143,30 +218,45 @@ Devuelve SÓLO un bloque ```python ... ```, sin explicación."""
 
 
 SYSTEM_PROMPT_OPERADOR = """Eres un asistente con acceso a:
-  - `df`: DataFrame de leads de Cañadata (columnas: industry, company_size, country, source, demo_requested, emails_opened, response_time_hours, n_meetings, decision_maker_contacted, quoted_acv_eur, converted, ...).
-  - `classifier` (dict con 'model', 'feature_names'). Predice conversión sobre 1 lead así:
+  - `df`: DataFrame de leads de Cañadata. **`lead_id` es una COLUMNA, no el índice.** Para buscar un lead por id, usa: `df[df['lead_id'] == 'L0050'].iloc[0].to_dict()`.
+  - Columnas de df: lead_id, company_name, industry, company_size, country, source, signup_date, demo_requested, emails_opened, response_time_hours, n_meetings, decision_maker_contacted, quoted_acv_eur, company_description, converted, converted_within_days, lead_segment_truth.
+
+  - `classifier` (dict con 'model', 'feature_names'). Para predecir conversión sobre 1 lead:
         X = build_X(lead_dict, CLF_INPUT_COLS, classifier['feature_names'])
         proba = classifier['model'].predict_proba(X)[0, 1]
-  - `regressor` (igual estructura, target en log space; convierte con np.exp).
+  - `regressor` (target en log space; convierte con np.exp):
+        X = build_X(lead_dict, REG_INPUT_COLS, regressor['feature_names'])
+        acv = float(np.exp(regressor['model'].predict(X))[0])
   - `clusterer` (dict con 'model', 'scaler', 'feature_names'). Para 1 lead:
         Xs = clusterer['scaler'].transform(build_X(lead_dict, REG_INPUT_COLS, clusterer['feature_names']))
         cluster_id = clusterer['model'].predict(Xs)[0]
-  - `timeseries` (dict con 'model' (SARIMAX fit), 'history' (Series mensual)).
-        forecast = timeseries['model'].get_forecast(steps=N).predicted_mean
-  - `build_X(lead_dict, columns, training_features)` helper para construir features de 1 lead.
+  - `timeseries` (dict con 'model' (Prophet entrenado), 'history' (Series mensual)). Para forecast:
+        future = timeseries['model'].make_future_dataframe(periods=N, freq='MS')
+        fc = timeseries['model'].predict(future)
+        forecast = fc.set_index('ds')['yhat'].iloc[-N:]
+  - `build_X(lead_dict, columns, training_features)` helper.
   - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
 
+**IMPORTANTE — construcción de leads hipotéticos**:
+Si el usuario describe un lead hipotético sin todas las features, RELLENA LOS HUECOS con estos defaults razonables:
+    DEFAULTS = {
+        'industry': 'SaaS', 'company_size': 100, 'country': 'ES', 'source': 'organic',
+        'demo_requested': False, 'emails_opened': 5, 'response_time_hours': 24,
+        'n_meetings': 1, 'decision_maker_contacted': False, 'quoted_acv_eur': 5000.0
+    }
+    lead = {**DEFAULTS, **lo_que_el_usuario_dijo}
+
 Reglas:
-  - Para "¿qué probabilidad tiene este lead de convertir?" usa el clasificador entrenado.
-  - Para "¿cuál es la tasa de conversión por industria en los datos?" usa `df` directamente.
-  - Para predicción de ACV de un lead específico: regressor con np.exp.
-  - Para forecast temporal: timeseries.
-  - Para descubrir cluster de un lead: clusterer.
-  - Termina con `resultado = ...`.
-  - Devuelve SÓLO ```python ... ```, sin explicación."""
+  - Para "¿qué probabilidad tiene este lead?" usa el clasificador.
+  - Para "¿tasa de conversión por X en df?" usa df.
+  - Para predicción de ACV individual: regressor con np.exp.
+  - Para forecast temporal: timeseries con Prophet.
+  - Para cluster: clusterer con scaler.
+  - Termina con `resultado = ...`. Devuelve SÓLO ```python ... ```."""
 
 
-def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> str:
+@st.cache_data(show_spinner=False)
+def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, float]:
     resp = _client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -175,7 +265,9 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> str:
         ],
         temperature=0.0,
     )
-    return resp.choices[0].message.content
+    cost = (resp.usage.prompt_tokens * COST_IN
+            + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    return resp.choices[0].message.content, cost
 
 
 def extract_code(text: str) -> str:
@@ -210,7 +302,8 @@ regressor = load_regressor()
 clusterer = load_clusterer()
 timeseries = load_timeseries()
 client = get_openai_client()
-cluster_to_archetype = cluster_archetype_map(df, clusterer)
+with st.spinner("Mapeando clusters → arquetipos (primera carga, ~2-5 s)…"):
+    cluster_to_archetype = cluster_archetype_map(df, clusterer)
 
 
 # ── App ────────────────────────────────────────────────────
@@ -224,6 +317,8 @@ with st.sidebar:
     st.divider()
     st.subheader("Forecast")
     forecast_months = st.slider("Meses", 1, 12, 6)
+
+render_cost_sidebar()
 
 lead = df[df["lead_id"] == lead_id].iloc[0].to_dict()
 
@@ -267,7 +362,8 @@ with col_llm:
     st.subheader("🤖 LLM zero-shot")
     if isinstance(desc, str) and desc.strip():
         with st.spinner("LLM…"):
-            score = llm_score_lead(client, lead_id, desc)
+            score, cost_zs = llm_score_lead(client, lead_id, desc)
+        track_cost(f"v2-score:{lead_id}", cost_zs)
         proba_llm = score / 100.0 if score >= 0 else None
         st.metric("P(convertir)", f"{score}%" if score >= 0 else "n/d")
         st.caption("Sólo lee `company_description`.")
@@ -327,7 +423,8 @@ do_compare = cta_b.button("Comparar modos", disabled=not pregunta.strip())
 if do_run:
     sys_prompt = SYSTEM_PROMPT_OPERADOR if modo == "operador" else SYSTEM_PROMPT_ANALISTA
     with st.spinner(f"LLM (modo {modo})…"):
-        raw = ask_llm_for_code(client, pregunta, sys_prompt)
+        raw, cost = ask_llm_for_code(client, pregunta, sys_prompt)
+        track_cost(f"v2-chat-{modo}:{pregunta}", cost)
         code = extract_code(raw)
     with st.expander(f"Código generado ({modo})"):
         st.code(code, language="python")
@@ -350,11 +447,12 @@ if do_compare:
         with col:
             st.markdown(f"### {name}")
             with st.spinner("…"):
-                raw = ask_llm_for_code(client, pregunta, sys_p)
+                raw, cost = ask_llm_for_code(client, pregunta, sys_p)
                 code = extract_code(raw)
+            mode_key = "analista" if "analista" in name.lower() else "operador"
+            track_cost(f"v2-cmp-{mode_key}:{pregunta}", cost)
             with st.expander("Código"):
                 st.code(code, language="python")
-            mode_key = "analista" if "analista" in name.lower() else "operador"
             res, err = run_code(code, df, mode_key)
             if err:
                 st.error(err)
