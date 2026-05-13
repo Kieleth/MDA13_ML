@@ -5,17 +5,23 @@
 #
 # Requisitos:
 #   pip install openai python-dotenv pandas
-#   .env con OPENAI_API_KEY=sk-...
+#   .env (al lado de este archivo) con OPENAI_API_KEY=sk-...
+#
+# Cómo ejecutar:
+#   python ask_my_data.py    # NO es Streamlit. Bucle input() en terminal.
 
 import os
 import re
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
+# Busca el .env al lado del script (no en el cwd) para que funcione desde
+# cualquier directorio cuando copies este archivo a otro proyecto.
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 
 # ── 1. CAMBIA ESTAS DOS VARIABLES POR TU DATASET ──────────────────────
@@ -38,9 +44,20 @@ Devuelve SÓLO un bloque ```python ... ```, sin explicación."""
 
 # ── 3. Bucle pregunta → código → resultado ────────────────────────────
 df = pd.read_csv(csv_path)
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+api_key = os.environ.get("OPENAI_API_KEY")
+if not api_key:
+    raise SystemExit(
+        "OPENAI_API_KEY no está en el entorno. Crea un .env al lado de este "
+        "script con: OPENAI_API_KEY=sk-..."
+    )
+client = OpenAI(api_key=api_key)
 
 
+# AVISO: exec() sobre código que escribió un LLM. En LOCAL, sobre tu df,
+# el peor caso es un error de pandas, lo ves y arreglas. En PRODUCCIÓN
+# esto va con sandbox (subprocess + timeout), function calling tipado,
+# o SQL gen contra una DB read-only. Nunca exec() directo.
 def ask(question: str) -> None:
     resp = client.chat.completions.create(
         model="gpt-4.1-mini",

@@ -246,6 +246,14 @@ if st.button("Preguntar", type="primary", disabled=not pregunta.strip()):
             st.write(resultado)
 
 st.divider()
+with st.expander("✅ Valores esperados (sanity check)"):
+    st.markdown("""
+- **paso_4**: L0001 → score LLM ~10 (rango 5-20). Coste ~0.04 m€/call.
+- **paso_5**: `tasa de conversión por industria` → 5 filas, valores entre 0.30 y 0.55.
+- **paso_5**: `ACV medio por arquetipo` → 3 filas (quick_mover, strategic, tire_kicker).
+- **paso_6**: L0050 con operador → cluster #2 (strategic en este dataset).
+""")
+st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """

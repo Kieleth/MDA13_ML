@@ -48,6 +48,39 @@ load_dotenv(ROOT / ".env")
 st.set_page_config(page_title="Cañadata — paso 4", page_icon="🤖", layout="wide")
 
 
+def _preflight_pkls() -> None:
+    """Falla loud si los .pkl de S1 faltan o tienen shape rota."""
+    expected = {
+        "classifier.pkl": {"model", "feature_names"},
+        "regressor.pkl": {"model", "feature_names"},
+        "clusterer.pkl": {"model", "scaler", "feature_names"},
+    }
+    models_dir = ROOT / "session1" / "models"
+    for fname, expected_keys in expected.items():
+        path = models_dir / fname
+        if not path.exists():
+            st.error(
+                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+                f"(`pre_class/1_classical_models.ipynb`) para regenerarlo."
+            )
+            st.stop()
+        try:
+            obj = joblib.load(path)
+        except Exception as e:
+            st.error(f"No se pudo cargar `{fname}`: {e}. Re-genera con el notebook de pre-clase.")
+            st.stop()
+        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
+            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
+            st.error(
+                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, "
+                f"encontradas: {keys_found}."
+            )
+            st.stop()
+
+
+_preflight_pkls()
+
+
 def track_cost(key: str, cost_eur: float) -> None:
     bag = st.session_state.setdefault("llm_call_costs", {})
     bag[key] = cost_eur
@@ -178,13 +211,16 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
     return score, cost_eur
 
 
-# ── App ────────────────────────────────────────────────────
+# ── Cargas (igual patrón que paso_5 y paso_6) ──────────────
 
 df = load_data()
 classifier = load_classifier()
 regressor = load_regressor()
 clusterer = load_clusterer()
 client = get_openai_client()
+
+
+# ── App ────────────────────────────────────────────────────
 
 st.title("🤖 Cañadata — paso 4: clasificador clásico vs LLM zero-shot")
 st.caption(f"{len(df):,} leads · clasificador `{classifier['kind']}` · LLM `{MODEL}`")
@@ -260,6 +296,13 @@ st.caption(
     "leyendo la descripción. Mira si están de acuerdo o si discrepan."
 )
 
+st.divider()
+with st.expander("✅ Valores esperados (sanity check)"):
+    st.markdown("""
+- **paso_4**: L0001 → score LLM ~10 (rango 5-20). Coste ~0.04 m€/call.
+- **paso_5**: `tasa de conversión por industria` → 5 filas, valores entre 0.30 y 0.55.
+- **paso_6**: L0050 con operador → cluster #2 (strategic en este dataset). Coste ~0.14 m€/call.
+""")
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(

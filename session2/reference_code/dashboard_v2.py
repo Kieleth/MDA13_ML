@@ -37,6 +37,41 @@ load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="Cañadata — S2", page_icon="🧠", layout="wide")
 
+
+def _preflight_pkls() -> None:
+    """Falla loud si los .pkl de S1 faltan o tienen shape rota."""
+    expected = {
+        "classifier.pkl": {"model", "feature_names"},
+        "regressor.pkl": {"model", "feature_names"},
+        "clusterer.pkl": {"model", "scaler", "feature_names"},
+        "timeseries.pkl": {"model", "history"},
+    }
+    models_dir = ROOT / "session1" / "models"
+    for fname, expected_keys in expected.items():
+        path = models_dir / fname
+        if not path.exists():
+            st.error(
+                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+                f"(`pre_class/1_classical_models.ipynb`) para regenerarlo."
+            )
+            st.stop()
+        try:
+            obj = joblib.load(path)
+        except Exception as e:
+            st.error(f"No se pudo cargar `{fname}`: {e}. Re-genera con el notebook de pre-clase.")
+            st.stop()
+        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
+            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
+            st.error(
+                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, "
+                f"encontradas: {keys_found}."
+            )
+            st.stop()
+
+
+_preflight_pkls()
+
+
 MODEL = "gpt-4.1-mini"
 # Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
 COST_IN = 0.40 / 1_000_000
@@ -157,7 +192,9 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
 
 SYSTEM_PROMPT_ANALISTA = """Eres un analista de datos. Tienes un DataFrame de pandas llamado `df` con datos de leads B2B (Cañadata).
 
-Columnas: lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech, retail, logistics, healthcare, unknown}), company_size (int), country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), signup_date (str YYYY-MM-DD), source (str ∈ {organic, paid, referral, conference, outbound, unknown}), demo_requested (bool), emails_opened (int), response_time_hours (float), n_meetings (int), decision_maker_contacted (bool), quoted_acv_eur (float), company_description (str), converted (bool), converted_within_days (float, NaN si no convirtió), lead_segment_truth (str, USA SÓLO PARA EVALUAR, no como feature).
+Columnas: lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech, retail, logistics, healthcare, unknown}), company_size (int), country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), source (str ∈ {organic, paid, referral, conference, outbound}), demo_requested (bool), emails_opened (float), response_time_hours (float), n_meetings (int), decision_maker_contacted (bool), quoted_acv_eur (float), company_description (str), converted (bool), converted_within_days (float, NaN si no convirtió), lead_segment_truth (str, USA SÓLO PARA EVALUAR, no como feature).
+
+**`lead_id` es una COLUMNA, no el índice.** Para buscar un lead por id: `df[df['lead_id'] == 'L0050'].iloc[0].to_dict()`.
 
 Genera código Python pandas para responder la pregunta del usuario.
 Termina asignando el resultado a una variable llamada `resultado`.

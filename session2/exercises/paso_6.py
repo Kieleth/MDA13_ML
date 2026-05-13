@@ -18,6 +18,8 @@
 #
 # Y termina con la VISTA DE COMPARACIÓN: misma pregunta, modo analista
 # vs modo operador. Cuándo da igual, cuándo cambia la respuesta.
+# (Zero-shot ya estuvo en paso_4; los tres modos medidos llegan en S3
+# paso_7. Aquí contrastamos solo las dos formas de DAR HERRAMIENTAS.)
 #
 # ── Huecos ──────────────────────────────────────────────────
 #
@@ -53,6 +55,41 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="Cañadata — paso 6", page_icon="🧠", layout="wide")
+
+
+def _preflight_pkls() -> None:
+    """Falla loud si los .pkl de S1 faltan o tienen shape rota."""
+    expected = {
+        "classifier.pkl": {"model", "feature_names"},
+        "regressor.pkl": {"model", "feature_names"},
+        "clusterer.pkl": {"model", "scaler", "feature_names"},
+        "timeseries.pkl": {"model", "history"},
+    }
+    models_dir = ROOT / "session1" / "models"
+    for fname, expected_keys in expected.items():
+        path = models_dir / fname
+        if not path.exists():
+            st.error(
+                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+                f"(`pre_class/1_classical_models.ipynb`) para regenerarlo."
+            )
+            st.stop()
+        try:
+            obj = joblib.load(path)
+        except Exception as e:
+            st.error(f"No se pudo cargar `{fname}`: {e}. Re-genera con el notebook de pre-clase.")
+            st.stop()
+        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
+            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
+            st.error(
+                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, "
+                f"encontradas: {keys_found}."
+            )
+            st.stop()
+
+
+_preflight_pkls()
+
 
 MODEL = "gpt-4.1-mini"
 # Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
@@ -131,12 +168,29 @@ def build_X(lead: dict, columns: list[str], training_features: list[str]) -> pd.
     return X.reindex(columns=training_features, fill_value=0)
 
 
+@st.cache_data
+def cluster_archetype_map(_df, _clusterer):
+    """Mapea cluster_id → arquetipo dominante (quick_mover / strategic / tire_kicker).
+
+    Útil para que el operador devuelva 'cluster 2 (strategic)' en vez de solo '2'.
+    """
+    rows = []
+    for _, row in _df.iterrows():
+        X = build_X(row.to_dict(), REG_INPUT_COLS, _clusterer["feature_names"])
+        Xs = _clusterer["scaler"].transform(X)
+        rows.append({"cluster": _clusterer["model"].predict(Xs)[0],
+                     "archetype": row["lead_segment_truth"]})
+    df_clu = pd.DataFrame(rows)
+    return df_clu.groupby("cluster")["archetype"].agg(lambda s: s.mode().iloc[0]).to_dict()
+
+
 df = load_data()
 classifier = load_classifier()
 regressor = load_regressor()
 clusterer = load_clusterer()
 timeseries = load_timeseries()
 client = get_openai_client()
+cluster_to_archetype = cluster_archetype_map(df, clusterer)
 
 
 # ── SYSTEM_PROMPT_OPERADOR (PRE-ESCRITO — léelo, no es la lección) ────
@@ -165,6 +219,9 @@ SYSTEM_PROMPT_OPERADOR = """Eres un asistente con acceso a:
         forecast = fc.set_index('ds')['yhat'].iloc[-N:]
   - `build_X(lead_dict, columns, training_features)` helper.
   - `CLF_INPUT_COLS`, `REG_INPUT_COLS` constantes.
+  - `cluster_to_archetype`: dict {cluster_id: archetype}. Tras predecir cluster, mapea con:
+        archetype = cluster_to_archetype.get(cluster_id, "?")
+    Para que la respuesta sea 'cluster 2 (strategic)' en vez de solo '2'.
 
 **IMPORTANTE — construcción de leads hipotéticos**:
 Si el usuario describe un lead hipotético sin todas las features, RELLENA LOS HUECOS con estos defaults razonables:
@@ -239,7 +296,8 @@ def run_code(code: str, df: pd.DataFrame, mode: str):
     # ── HUECO 1 ────────────────────────────────────────────
     # En modo "analista": ns = {"df": df, "pd": pd, "np": np}
     # En modo "operador": añade al ns: classifier, regressor, clusterer,
-    #     timeseries, build_X, CLF_INPUT_COLS, REG_INPUT_COLS.
+    #     timeseries, build_X, CLF_INPUT_COLS, REG_INPUT_COLS,
+    #     cluster_to_archetype.
     # Luego: exec(code, ns); return ns.get("resultado", ...)
     # ──────────────────────────────────────────────────────
     ns = ___
@@ -334,7 +392,13 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
 #           res_op, err_op = run_code(code_op, df, "operador")
 #           # render igual que arriba
 # ──────────────────────────────────────────────────────────
-st.info("👉 HUECO 3 pendiente: sustituye esta línea por la vista de comparación (sigue el patrón de la pista de arriba).")
+st.info(
+    "👉 HUECO 3 pendiente: sustituye esta línea por la vista de comparación "
+    "(sigue el patrón de la pista de arriba).\n\n"
+    "Aquí contrastamos **analista vs operador**, las dos formas de DAR HERRAMIENTAS al LLM. "
+    "El zero-shot ya lo viste en paso_4. El contraste cuantitativo de los tres modos "
+    "(con AUC, coste, latencia, intervalos de confianza) llega en S3 paso_7."
+)
 
 
 # ── Cierre: puente a S3 (el jueves) ────────────────────────
@@ -347,6 +411,14 @@ st.info(
 )
 
 
+st.divider()
+with st.expander("✅ Valores esperados (sanity check)"):
+    st.markdown("""
+- **paso_4**: L0001 → score LLM ~10 (rango 5-20). Coste ~0.04 m€/call.
+- **paso_5**: `tasa de conversión por industria` → 5 filas, valores entre 0.30 y 0.55.
+- **paso_6**: L0050 con operador → cluster #2 (strategic en este dataset). Coste ~0.14 m€/call.
+- **paso_6**: ACV fintech, 200 emp, 4 reuniones → ~9.000-10.000 €.
+""")
 st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
