@@ -45,7 +45,6 @@ import os
 import re
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -56,6 +55,21 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="Cañadata — paso 5", page_icon="🧮", layout="wide")
+
+
+def _preflight() -> None:
+    """Falla loud si los datos de S1 faltan."""
+    csv_path = ROOT / "data" / "canadata_leads_clean.csv"
+    if not csv_path.exists():
+        st.error(
+            f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+            f"(`pre_class/1_classical_models.ipynb`) — lo genera al limpiar el CSV."
+        )
+        st.stop()
+
+
+_preflight()
+
 
 MODEL = "gpt-4.1-mini"
 # Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
@@ -93,7 +107,17 @@ def get_openai_client() -> OpenAI:
     if not api_key:
         st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz con la clave de Luis.")
         st.stop()
-    return OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=10.0)
+    # Ping ~free para detectar 401/red rota antes del primer click del alumno.
+    try:
+        client.models.list()
+    except Exception as e:
+        st.error(
+            f"No se pudo contactar OpenAI: `{type(e).__name__}`. "
+            f"Verifica red + que la API key es válida.\n\nDetalle: {e}"
+        )
+        st.stop()
+    return client
 
 
 df = load_data()
@@ -126,8 +150,12 @@ client = get_openai_client()
 #   Genera código Python pandas para responder la pregunta del usuario.
 #   Termina asignando el resultado a una variable llamada `resultado`.
 #   Devuelve SÓLO un bloque ```python ... ```, sin explicación."""
+#
+# (Hueco envuelto en función para que la app arranque sin error de import.
+#  La NameError sólo dispara cuando clicas "Preguntar".)
 # ──────────────────────────────────────────────────────────
-SYSTEM_PROMPT = ___
+def _build_system_prompt() -> str:
+    return ___
 
 
 @st.cache_data(show_spinner=False)
@@ -183,8 +211,8 @@ def extract_code(text: str) -> str:
 # ──────────────────────────────────────────────────────────
 def run_code(code: str, df: pd.DataFrame):
     try:
-        # Tres líneas aquí (ns, exec, return)
-        ___
+        # ← Borra `pass` y pon tres líneas: ns dict, exec(code, ns), return ns.get("resultado", "(no se asignó)"), None
+        pass
     except Exception as e:
         return None, str(e)
 
@@ -220,7 +248,7 @@ pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
 
 if st.button("Preguntar", type="primary", disabled=not pregunta.strip()):
     with st.spinner("LLM redactando código…"):
-        raw, cost = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT)
+        raw, cost = ask_llm_for_code(client, pregunta, _build_system_prompt())
         track_cost(f"paso5:{pregunta}", cost)
         code = extract_code(raw)
 

@@ -38,8 +38,15 @@ load_dotenv(ROOT / ".env")
 st.set_page_config(page_title="Cañadata — S2", page_icon="🧠", layout="wide")
 
 
-def _preflight_pkls() -> None:
-    """Falla loud si los .pkl de S1 faltan o tienen shape rota."""
+def _preflight() -> None:
+    """Falla loud si datos o .pkl de S1 faltan o tienen shape rota."""
+    csv_path = ROOT / "data" / "canadata_leads_clean.csv"
+    if not csv_path.exists():
+        st.error(
+            f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+            f"(`pre_class/1_classical_models.ipynb`) — lo genera al limpiar."
+        )
+        st.stop()
     expected = {
         "classifier.pkl": {"model", "feature_names"},
         "regressor.pkl": {"model", "feature_names"},
@@ -69,7 +76,7 @@ def _preflight_pkls() -> None:
             st.stop()
 
 
-_preflight_pkls()
+_preflight()
 
 
 MODEL = "gpt-4.1-mini"
@@ -127,7 +134,16 @@ def get_openai_client() -> OpenAI:
     if not api_key:
         st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz.")
         st.stop()
-    return OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=10.0)
+    try:
+        client.models.list()
+    except Exception as e:
+        st.error(
+            f"No se pudo contactar OpenAI: `{type(e).__name__}`. "
+            f"Verifica red + que la API key es válida.\n\nDetalle: {e}"
+        )
+        st.stop()
+    return client
 
 
 # ── Helpers ────────────────────────────────────────────────
@@ -286,7 +302,8 @@ regressor = load_regressor()
 clusterer = load_clusterer()
 timeseries = load_timeseries()
 client = get_openai_client()
-cluster_to_archetype = cluster_archetype_map(df, clusterer)
+with st.spinner("Mapeando clusters → arquetipos (primera carga, ~2-5 s)…"):
+    cluster_to_archetype = cluster_archetype_map(df, clusterer)
 
 
 # ── App ────────────────────────────────────────────────────
