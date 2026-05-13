@@ -140,7 +140,7 @@ _hueco(1, "st.file_uploader y guardar bytes en NEW_BATCH (5-6 líneas)")
 if NEW_BATCH.exists():
     df_new = pd.read_csv(NEW_BATCH)
     with st.expander(f"Batch actual: {NEW_BATCH.name} ({len(df_new)} filas)"):
-        st.dataframe(df_new.head(20), use_container_width=True)
+        st.dataframe(df_new.head(20), width='stretch')
 else:
     st.info(f"No hay batch nuevo en `{NEW_BATCH.relative_to(ROOT)}` todavía. "
             "Sube uno arriba o usa el `canadata_next_batch.csv` que viene en el repo.")
@@ -173,7 +173,7 @@ if st.button("Reentrenar (dry-run)", type="primary"):
 if st.session_state.ship_dry is not None:
     rows = st.session_state.ship_dry["rows"]
     if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
     if st.session_state.ship_dry["passed"]:
         st.success("Todos los gates pasan. Puedes desplegar.")
     else:

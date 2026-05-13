@@ -101,7 +101,7 @@ else:
             })
         if rows:
             import pandas as pd
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
 
 st.divider()
@@ -164,7 +164,7 @@ if st.button("Correr retrain.py --dry-run", type="primary"):
     if rows:
         import pandas as pd
         st.subheader("Quality gates (dry-run)")
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
         st.session_state.last_dry_run = {"rows": rows, "passed": all(r["ok"] == "✓" for r in rows)}
 
 

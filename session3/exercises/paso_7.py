@@ -322,7 +322,7 @@ if st.button("Correr el harness", type="primary"):
         "convirtió": y_true.astype(bool),
         "arquetipo": sample["lead_segment_truth"].values,
     })
-    st.dataframe(detail, use_container_width=True, hide_index=True)
+    st.dataframe(detail, width='stretch', hide_index=True)
 
     # ── Threshold + matriz de confusión + valor esperado ──────
     #

@@ -267,7 +267,7 @@ with tab_pred:
         name="banda 80%",
     ))
     fig.update_layout(height=260, margin=dict(l=0, r=0, t=20, b=0))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     st.caption(f"MAPE en hold-out: {timeseries.get('validation_mape', 0):.1f}%")
 
 
@@ -371,7 +371,7 @@ with tab_harness:
             "P_LLM": proba_llm.round(3),
             "convirtió": y_true.astype(bool),
             "arquetipo": sample["lead_segment_truth"].values,
-        }), use_container_width=True, hide_index=True)
+        }), width='stretch', hide_index=True)
 
         # Threshold + matriz de confusión + EV
         st.divider()
@@ -428,7 +428,7 @@ with tab_ship:
     if NEW_BATCH.exists():
         df_new = pd.read_csv(NEW_BATCH)
         with st.expander(f"Batch actual ({len(df_new)} filas)"):
-            st.dataframe(df_new.head(10), use_container_width=True)
+            st.dataframe(df_new.head(10), width='stretch')
     else:
         st.caption("No hay batch nuevo. Si no subes uno, retrain reentrena sólo con histórico.")
 
@@ -453,7 +453,7 @@ with tab_ship:
     if st.session_state.ship_dry is not None:
         if st.session_state.ship_dry["rows"]:
             st.dataframe(pd.DataFrame(st.session_state.ship_dry["rows"]),
-                         use_container_width=True, hide_index=True)
+                         width='stretch', hide_index=True)
         if st.session_state.ship_dry["passed"]:
             st.success("Todos los gates pasan. Listo para deploy.")
         else:
