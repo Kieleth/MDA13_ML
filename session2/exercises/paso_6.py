@@ -98,6 +98,14 @@ def _preflight() -> None:
 _preflight()
 
 
+# ── Sentinel para huecos sin rellenar ────────────────────
+# Warning friendly + para limpio. Los componentes ya renderizados
+# arriba quedan visibles; los de abajo no, hasta que rellenes.
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
+
+
 MODEL = "gpt-4.1-mini"
 # Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
 COST_IN = 0.40 / 1_000_000
@@ -293,7 +301,7 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
     #       temperature=0.0,
     #   )
     # ──────────────────────────────────────────────────────
-    response = ___
+    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con system + user, temperature=0")
 
     cost = (response.usage.prompt_tokens * COST_IN
             + response.usage.completion_tokens * COST_OUT) * USD_TO_EUR
@@ -318,7 +326,7 @@ def run_code(code: str, df: pd.DataFrame, mode: str):
     #     cluster_to_archetype.
     # Luego: exec(code, ns); return ns.get("resultado", ...)
     # ──────────────────────────────────────────────────────
-    ns = ___
+    ns = _hueco(1, "construye el dict de namespace según `mode` (analista vs operador)")
 
     try:
         exec(code, ns)

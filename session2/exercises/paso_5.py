@@ -71,6 +71,14 @@ def _preflight() -> None:
 _preflight()
 
 
+# ── Sentinel para huecos sin rellenar ────────────────────
+# Warning friendly + para limpio. Los componentes ya renderizados
+# arriba quedan visibles; los de abajo no, hasta que rellenes.
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
+
+
 MODEL = "gpt-4.1-mini"
 # Precio gpt-4.1-mini (ene-2026): $0.40/1M input, $1.60/1M output
 COST_IN = 0.40 / 1_000_000
@@ -155,7 +163,7 @@ client = get_openai_client()
 #  La NameError sólo dispara cuando clicas "Preguntar".)
 # ──────────────────────────────────────────────────────────
 def _build_system_prompt() -> str:
-    return ___
+    return _hueco(1, "el system prompt como string con el schema completo de df")
 
 
 @st.cache_data(show_spinner=False)
@@ -177,7 +185,7 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
     #       temperature=0.0,   # código determinista
     #   )
     # ──────────────────────────────────────────────────────
-    response = ___
+    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con system + user, temperature=0")
 
     cost = (response.usage.prompt_tokens * COST_IN
             + response.usage.completion_tokens * COST_OUT) * USD_TO_EUR
@@ -196,7 +204,7 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
 # usado backticks).
 # ──────────────────────────────────────────────────────────
 def extract_code(text: str) -> str:
-    code = ___
+    code = _hueco(3, "extrae el código del bloque ```python ... ``` con re.search")
     return code
 
 
@@ -211,8 +219,8 @@ def extract_code(text: str) -> str:
 # ──────────────────────────────────────────────────────────
 def run_code(code: str, df: pd.DataFrame):
     try:
-        # ← Borra `pass` y pon tres líneas: ns dict, exec(code, ns), return ns.get("resultado", "(no se asignó)"), None
-        pass
+        # ← Borra el _hueco(...) y pon tres líneas: ns dict, exec(code, ns), return ns.get("resultado", "(no se asignó)"), None
+        _hueco(4, "tres líneas: ns dict, exec(code, ns), return ns.get('resultado'), None")
     except Exception as e:
         return None, str(e)
 

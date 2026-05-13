@@ -88,6 +88,15 @@ def _preflight() -> None:
 _preflight()
 
 
+# ── Sentinel para huecos sin rellenar ────────────────────
+# Muestra warning friendly y para la app limpio. Los componentes ya
+# renderizados arriba quedan visibles; los de abajo no renderizan
+# hasta que rellenes el hueco.
+def _hueco(n: int, desc: str = ""):
+    st.warning(f"👉 **HUECO {n} pendiente**: {desc}\n\nRellénalo en este archivo y refresca.")
+    st.stop()
+
+
 def track_cost(key: str, cost_eur: float) -> None:
     bag = st.session_state.setdefault("llm_call_costs", {})
     bag[key] = cost_eur
@@ -184,7 +193,7 @@ MODEL = "gpt-4.1-mini"
 #   Descripción: {description}"""
 # ──────────────────────────────────────────────────────────
 def build_scoring_prompt(description: str) -> str:
-    return ___
+    return _hueco(1, "construye el f-string del prompt (rol + tarea + formato)")
 
 
 # ── HUECO 2 ────────────────────────────────────────────────
@@ -211,7 +220,7 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
     Cached por (lead_id, description). _client opta fuera del hash.
     """
     prompt = build_scoring_prompt(description)
-    response = ___
+    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con max_tokens=10, temperature=0")
 
     text = response.choices[0].message.content.strip()
     cost_eur = (
@@ -224,7 +233,7 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
     # el número entero. Si no encuentras nada, devuelve -1.
     # Pista: usa re.search(r"\d+", text) y .group(0).
     # ──────────────────────────────────────────────────────
-    score = ___
+    score = _hueco(3, "parsea el primer número entero del texto con re.search")
     return score, cost_eur
 
 
