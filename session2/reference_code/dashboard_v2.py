@@ -403,7 +403,7 @@ fig.add_trace(go.Scatter(
     name="banda 80%",
 ))
 fig.update_layout(height=280, margin=dict(l=0, r=0, t=20, b=0))
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
 # Chat con modo seleccionable
 st.divider()
@@ -434,7 +434,7 @@ if do_run:
     else:
         st.subheader("Resultado")
         if isinstance(res, (pd.DataFrame, pd.Series)):
-            st.dataframe(res, use_container_width=True)
+            st.dataframe(res, width='stretch')
         else:
             st.write(res)
 
@@ -458,6 +458,6 @@ if do_compare:
                 st.error(err)
             else:
                 if isinstance(res, (pd.DataFrame, pd.Series)):
-                    st.dataframe(res, use_container_width=True)
+                    st.dataframe(res, width='stretch')
                 else:
                     st.write(res)

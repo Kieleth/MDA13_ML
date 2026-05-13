@@ -362,7 +362,7 @@ ejemplos = [
 cols = st.columns(len(ejemplos))
 clicked = None
 for i, ej in enumerate(ejemplos):
-    if cols[i].button(ej, key=f"ej_{i}", use_container_width=True):
+    if cols[i].button(ej, key=f"ej_{i}", width='stretch'):
         clicked = ej
 
 pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
@@ -381,7 +381,7 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
     else:
         st.subheader("Resultado (operador)")
         if isinstance(resultado, (pd.DataFrame, pd.Series)):
-            st.dataframe(resultado, use_container_width=True)
+            st.dataframe(resultado, width='stretch')
         else:
             st.write(resultado)
 
@@ -405,7 +405,7 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
 #           res_an, err_an = run_code(code_an, df, "analista")
 #           if err_an: st.error(err_an)
 #           elif isinstance(res_an, (pd.DataFrame, pd.Series)):
-#               st.dataframe(res_an, use_container_width=True)
+#               st.dataframe(res_an, width='stretch')
 #           else:
 #               st.write(res_an)
 #       with col_op:

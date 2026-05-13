@@ -233,7 +233,8 @@ st.caption(f"{len(df):,} leads · {len(df.columns)} columnas · modelo `{MODEL}`
 render_cost_sidebar()
 
 with st.expander("📋 Schema del DataFrame `df` (lo que ve el LLM)"):
-    st.dataframe(df.dtypes.rename("dtype").to_frame(), use_container_width=True)
+    # .astype(str) porque numpy.dtype no es serializable a Arrow.
+    st.dataframe(df.dtypes.astype(str).rename("dtype").to_frame(), width='stretch')
 
 # Ejemplos clicables
 st.subheader("Hazle una pregunta a los datos")
@@ -249,7 +250,7 @@ ejemplos = [
 cols = st.columns(len(ejemplos))
 clicked = None
 for i, ej in enumerate(ejemplos):
-    if cols[i].button(ej, key=f"ej_{i}", use_container_width=True):
+    if cols[i].button(ej, key=f"ej_{i}", width='stretch'):
         clicked = ej
 
 pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
@@ -275,9 +276,9 @@ if st.button("Preguntar", type="primary", disabled=not pregunta.strip()):
     else:
         st.subheader("Resultado")
         if isinstance(resultado, pd.DataFrame):
-            st.dataframe(resultado, use_container_width=True)
+            st.dataframe(resultado, width='stretch')
         elif isinstance(resultado, pd.Series):
-            st.dataframe(resultado.to_frame("valor"), use_container_width=True)
+            st.dataframe(resultado.to_frame("valor"), width='stretch')
         else:
             st.write(resultado)
 
