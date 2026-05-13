@@ -11,8 +11,8 @@
 # DataFrame real de Cañadata. La pregunta del usuario en español →
 # código Python → resultado real.
 #
-# Es el patrón text-to-code del taller anterior FitLife, aplicado
-# a un dataset distinto.
+# Es el patrón text-to-code: el LLM traduce lenguaje natural a código
+# Python que tú ejecutas contra tus datos.
 #
 # ⚠ AVISO DE SEGURIDAD — léelo antes de empezar
 #
@@ -111,9 +111,9 @@ client = get_openai_client()
 #   lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech,
 #   retail, logistics, healthcare, unknown}), company_size (int),
 #   country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), signup_date
-#   (datetime-string YYYY-MM-DD), source (str ∈ {organic, paid, referral,
-#   conference, outbound, unknown}), demo_requested (bool),
-#   emails_opened (int), response_time_hours (float), n_meetings (int),
+#   (str YYYY-MM-DD), source (str ∈ {organic, paid, referral, conference,
+#   outbound}), demo_requested (bool), emails_opened (float),
+#   response_time_hours (float), n_meetings (int),
 #   decision_maker_contacted (bool), quoted_acv_eur (float),
 #   company_description (str), converted (bool), converted_within_days
 #   (float, NaN si no convirtió), lead_segment_truth (str ∈ {quick_mover,
@@ -174,17 +174,17 @@ def extract_code(text: str) -> str:
 
 # ── HUECO 4 ────────────────────────────────────────────────
 # Ejecuta el código en un namespace controlado y devuelve el valor
-# de `resultado`. Patrón:
+# de `resultado`. Tres líneas:
 #   ns = {"df": df, "pd": pd, "np": np}
 #   exec(code, ns)
-#   return ns.get("resultado", "(no se asignó `resultado`)")
+#   return ns.get("resultado", "(no se asignó `resultado`)"), None
 #
-# Envuélvelo en try/except para que un fallo no rompa la app.
+# El try/except ya está montado para que un fallo no rompa la app.
 # ──────────────────────────────────────────────────────────
 def run_code(code: str, df: pd.DataFrame):
     try:
-        result = ___
-        return result, None
+        # Tres líneas aquí (ns, exec, return)
+        ___
     except Exception as e:
         return None, str(e)
 
@@ -250,7 +250,7 @@ st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """
 - **Memoria conversacional**: en vez de una pregunta única, mantén el historial en `st.session_state.messages` y deja que el alumno haga preguntas de seguimiento ("y filtrado por España"). Pista: pasa el historial al LLM como `messages`.
-- **Auto-reparación**: si el código falla, vuelve a llamar al LLM con el error y pídele que corrija. Hasta 2 intentos. Es el patrón paso_11 de FitLife.
+- **Auto-reparación**: si el código falla, vuelve a llamar al LLM con el error y pídele que corrija. Hasta 2 intentos. Patrón estándar de text-to-code en producción.
 - **Validación del resultado**: añade reglas de sanidad (¿el porcentaje está entre 0 y 100? ¿la cuenta de filas tiene sentido?). Si no, avisa al usuario.
 - **Restricciones de seguridad**: bloquea `import`, `open`, `os.system` en el código antes de exec(). En este taller no hace falta porque corremos local, en prod sí.
 - **Few-shot**: añade 2-3 ejemplos de pregunta → código al system prompt. Mejora mucho la calidad sobre preguntas que requieren cruzar columnas.
