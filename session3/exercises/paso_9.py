@@ -235,6 +235,15 @@ _hueco(5, "tabla comparativa antes/después leyendo flag y session_state.ship_dr
 
 
 st.divider()
+with st.expander("✅ Valores esperados (sanity check)"):
+    st.markdown("""
+- **Subir `canadata_next_batch.csv`** (150 filas que vienen en `session3/new_data/`): se guarda en NEW_BATCH, el preview muestra las primeras 20 filas.
+- **Dry-run sobre histórico + batch**: ~5s. Los 4 gates pasan en verde si el batch tiene distribución parecida al histórico.
+- **Deploy real**: ~5s adicionales. El JSON flag se reescribe con el nuevo timestamp + nuevos AUCs. Los `.pkl` viejos quedan en `session1/models/_prev/` (swap atómico).
+- **Tras `st.cache_resource.clear() + st.rerun()`**: la sección "1. Estado actual" muestra el nuevo timestamp y las nuevas métricas. Si abres paso_6 o dashboard_v3 en otra pestaña y refrescas, las predicciones ya usan los modelos nuevos.
+- **Si los gates fallan**: el botón DEPLOY queda deshabilitado. Mira el output del dry-run para identificar qué métrica no pasó.
+""")
+st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """

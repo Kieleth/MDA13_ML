@@ -49,6 +49,49 @@ NEW_BATCH = NEW_DATA_DIR / "canadata_next_batch.csv"
 FLAG = ROOT / "session1" / "models" / "_retrained_at.json"
 
 
+def _preflight() -> None:
+    """Falla loud si datos o .pkl de S1 faltan o tienen shape rota."""
+    for csv_path in [ROOT / "data" / "canadata_leads_clean.csv",
+                     ROOT / "data" / "canadata_holdout.csv"]:
+        if not csv_path.exists():
+            st.error(
+                f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+                f"(`pre_class/1_classical_models.ipynb`)."
+            )
+            st.stop()
+    expected = {
+        "classifier.pkl": {"model", "feature_names"},
+        "regressor.pkl": {"model", "feature_names"},
+        "clusterer.pkl": {"model", "scaler", "feature_names"},
+        "timeseries.pkl": {"model", "history"},
+    }
+    models_dir = ROOT / "session1" / "models"
+    for fname, expected_keys in expected.items():
+        path = models_dir / fname
+        if not path.exists():
+            st.error(
+                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase para regenerarlo."
+            )
+            st.stop()
+        try:
+            obj = joblib.load(path)
+        except Exception as e:
+            st.error(f"No se pudo cargar `{fname}`: {e}.")
+            st.stop()
+        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
+            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
+            st.error(
+                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, encontradas: {keys_found}."
+            )
+            st.stop()
+    if not RETRAIN.exists():
+        st.error(f"Falta `{RETRAIN.relative_to(ROOT)}`. Asegúrate de estar en la rama `session-3`.")
+        st.stop()
+
+
+_preflight()
+
+
 # ── Carga ──────────────────────────────────────────────────
 
 @st.cache_data
@@ -87,7 +130,16 @@ def get_openai_client():
     if not key:
         st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz.")
         st.stop()
-    return OpenAI(api_key=key)
+    client = OpenAI(api_key=key, timeout=10.0)
+    try:
+        client.models.list()
+    except Exception as e:
+        st.error(
+            f"No se pudo contactar OpenAI: `{type(e).__name__}`. "
+            f"Verifica red + que la API key es válida.\n\nDetalle: {e}"
+        )
+        st.stop()
+    return client
 
 
 # ── Helpers ────────────────────────────────────────────────

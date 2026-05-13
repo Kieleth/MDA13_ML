@@ -382,6 +382,16 @@ if st.button("Correr el harness", type="primary"):
 
 
 st.divider()
+with st.expander("✅ Valores esperados (sanity check sobre 50 leads del holdout)"):
+    st.markdown("""
+- **AUC clasificador**: ~0.91 (CI 95%: ~0.82-0.98).
+- **AUC LLM zero-shot**: ~0.69 (CI 95%: ~0.55-0.82).
+- **Solapamiento de CIs**: a n=50 los intervalos casi se tocan — no afirmes señal limpia. A n=100 se separan.
+- **Coste**: ~0.03 m€/lead. 50 leads ≈ 0.15 cent. 1000 leads ≈ 3 cent.
+- **Latencia LLM**: ~650 ms/lead (1 llamada secuencial). Clf vectorizado: 24 ms para los 50.
+- **EV @ threshold 0.5** con 5000 €/firma y 5 €/llamada: clf gana al LLM por ~factor 5-10×.
+""")
+st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """

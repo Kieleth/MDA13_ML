@@ -196,6 +196,14 @@ else:
 
 
 st.divider()
+with st.expander("✅ Valores esperados (sanity check)"):
+    st.markdown("""
+- **Primer dry-run** (sin deploy previo, gates con umbrales iniciales): los 4 gates pasan en verde (clasificador AUC ≥ 0.8, regressor MAPE ≤ 0.5, clusterer ARI ≥ 0.2, timeseries MAPE ≤ 200).
+- **Dry-run posterior con datos parecidos**: los gates se comparan al modelo en producción (95% del previo). Si retrenas sobre los mismos datos, los gates pasan con margen estrecho — eso es esperado.
+- **Output del subprocess**: cada gate es 1 línea con la forma `✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))`. El comparador entre paréntesis tiene paréntesis anidados — usa un regex tolerante (`re.findall(r"([✓✗])\\s+(\\w+):\\s+([\\d.]+)\\s+\\((.+)\\)\\s*$", ...)` con `MULTILINE`).
+- **Returncode de retrain.py**: 0 si todos los gates pasan, 1 si alguno falla. Si falla en dry-run, el deploy real queda bloqueado.
+""")
+st.divider()
 st.subheader("🚀 Si te quedas con ganas")
 st.markdown(
     """
