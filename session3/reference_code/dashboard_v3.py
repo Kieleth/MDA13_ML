@@ -1,18 +1,12 @@
 # ============================================================
-# dashboard_v3.py — S3 dashboard (versión completa)
+# dashboard_v3.py · S3 reveal · asistente comercial completo
 # ============================================================
 #
-# Lo que sale al final de la S3: el dashboard de S2 + la pipeline
-# de ship-it (subir batch → reentrenar → quality gates → deploy →
-# auto-recarga).
+# Versión COMPLETA del paso_7 con las 4 huecos rellenos y UNA
+# tool extra (`draft_outreach_email`) como demo de cómo añadir
+# una capacidad nueva al bot.
 #
-# Tres pestañas:
-#   🔍 Predicciones — los 4 modelos clásicos + 3 modos LLM
-#                     (heredado de dashboard_v2.py)
-#   📊 Harness     — compara clásico vs LLM zero-shot en el holdout
-#   🚀 Ship it     — retrain con quality gates y deploy automático
-#
-# Cómo ejecutar:
+# Lo lanza el profesor al final del bloque paso_7 como reveal.
 #
 #   streamlit run session3/reference_code/dashboard_v3.py
 #
@@ -20,10 +14,6 @@
 
 import json
 import os
-import re
-import subprocess
-import sys
-import time
 import warnings
 from pathlib import Path
 
@@ -35,102 +25,81 @@ import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
-from sklearn.metrics import roc_auc_score
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT / ".env")
 
-st.set_page_config(page_title="Cañadata — S3", page_icon="🚀", layout="wide")
-MODEL = "gpt-4.1-mini"
+st.set_page_config(page_title="Cañadata · S3 reveal", page_icon="🚀", layout="wide")
 
-RETRAIN = ROOT / "session3" / "retrain.py"
-NEW_DATA_DIR = ROOT / "session3" / "new_data"
-NEW_BATCH = NEW_DATA_DIR / "canadata_next_batch.csv"
-FLAG = ROOT / "session1" / "models" / "_retrained_at.json"
+MODEL = "gpt-4.1-mini"
+COST_IN = 0.40 / 1_000_000
+COST_OUT = 1.60 / 1_000_000
+USD_TO_EUR = 0.93
 
 
 def _preflight() -> None:
-    """Falla loud si datos o .pkl de S1 faltan o tienen shape rota."""
-    for csv_path in [ROOT / "data" / "canadata_leads_clean.csv",
-                     ROOT / "data" / "canadata_holdout.csv"]:
-        if not csv_path.exists():
-            st.error(
-                f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
-                f"(`pre_class/1_classical_models.ipynb`)."
-            )
-            st.stop()
-    expected = {
-        "classifier.pkl": {"model", "feature_names"},
-        "regressor.pkl": {"model", "feature_names"},
-        "clusterer.pkl": {"model", "scaler", "feature_names"},
-        "timeseries.pkl": {"model", "history"},
-    }
-    models_dir = ROOT / "session1" / "models"
-    for fname, expected_keys in expected.items():
-        path = models_dir / fname
-        if not path.exists():
-            st.error(
-                f"Falta `{path.relative_to(ROOT)}`. Corre el notebook de pre-clase para regenerarlo."
-            )
-            st.stop()
-        try:
-            obj = joblib.load(path)
-        except Exception as e:
-            st.error(f"No se pudo cargar `{fname}`: {e}.")
-            st.stop()
-        if not isinstance(obj, dict) or not expected_keys.issubset(obj.keys()):
-            keys_found = set(obj.keys()) if isinstance(obj, dict) else type(obj).__name__
-            st.error(
-                f"`{fname}` shape inesperada. Esperaba keys ⊇ {expected_keys}, encontradas: {keys_found}."
-            )
-            st.stop()
-    if not RETRAIN.exists():
-        st.error(f"Falta `{RETRAIN.relative_to(ROOT)}`. Asegúrate de estar en la rama `session-3`.")
+    """Falla loud si datos o modelos de S1 faltan."""
+    csv_path = ROOT / "data" / "canadata_leads_clean.csv"
+    if not csv_path.exists():
+        st.error(
+            f"Falta `{csv_path.relative_to(ROOT)}`. Corre el notebook de pre-clase "
+            f"(`pre_class/1_classical_models.ipynb`)."
+        )
         st.stop()
+    for fname in ["classifier.pkl", "regressor.pkl", "clusterer.pkl"]:
+        path = ROOT / "session1" / "models" / fname
+        if not path.exists():
+            st.error(f"Falta `{path.relative_to(ROOT)}`. Regenera con el notebook de pre-clase.")
+            st.stop()
 
 
 _preflight()
 
 
-# ── Carga ──────────────────────────────────────────────────
+def track_cost(key: str, cost_eur: float) -> None:
+    bag = st.session_state.setdefault("llm_call_costs", {})
+    bag[key] = cost_eur
+
+
+def render_cost_sidebar() -> None:
+    bag = st.session_state.get("llm_call_costs", {})
+    if not bag:
+        return
+    total = sum(bag.values())
+    with st.sidebar:
+        st.divider()
+        st.metric("💰 Coste LLM", f"{total*100:.3f} céntimos", f"{len(bag)} interacciones")
+
+
+# ── Carga de datos y modelos ────────────────────────────────
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
     return pd.read_csv(ROOT / "data" / "canadata_leads_clean.csv")
 
 
-@st.cache_data
-def load_holdout() -> pd.DataFrame:
-    return pd.read_csv(ROOT / "data" / "canadata_holdout.csv")
-
-
 @st.cache_resource
-def load_classifier():
+def load_classifier() -> dict:
     return joblib.load(ROOT / "session1" / "models" / "classifier.pkl")
 
 
 @st.cache_resource
-def load_regressor():
+def load_regressor() -> dict:
     return joblib.load(ROOT / "session1" / "models" / "regressor.pkl")
 
 
 @st.cache_resource
-def load_clusterer():
+def load_clusterer() -> dict:
     return joblib.load(ROOT / "session1" / "models" / "clusterer.pkl")
 
 
 @st.cache_resource
-def load_timeseries():
-    return joblib.load(ROOT / "session1" / "models" / "timeseries.pkl")
-
-
-@st.cache_resource
-def get_openai_client():
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz.")
+def get_openai_client() -> OpenAI:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        st.error("OPENAI_API_KEY no está. Crea `.env` en la raíz con la clave de Luis.")
         st.stop()
-    client = OpenAI(api_key=key, timeout=10.0)
+    client = OpenAI(api_key=api_key, timeout=15.0)
     try:
         client.models.list()
     except Exception as e:
@@ -142,8 +111,6 @@ def get_openai_client():
     return client
 
 
-# ── Helpers ────────────────────────────────────────────────
-
 CLF_INPUT_COLS = [
     "industry", "company_size", "country", "source", "demo_requested",
     "emails_opened", "response_time_hours", "n_meetings",
@@ -153,7 +120,8 @@ REG_INPUT_COLS = [c for c in CLF_INPUT_COLS if c != "quoted_acv_eur"]
 
 
 def build_X(lead: dict, columns: list[str], training_features: list[str]) -> pd.DataFrame:
-    d = pd.DataFrame([{k: lead[k] for k in columns}])
+    """Reconstruye la matriz de features para un lead (one-hot + reindex a las columnas de training)."""
+    d = pd.DataFrame([{k: lead.get(k) for k in columns}])
     cat_cols = [c for c in ["industry", "country", "source"] if c in columns]
     X = pd.get_dummies(d, columns=cat_cols)
     for col in ["demo_requested", "decision_maker_contacted"]:
@@ -162,374 +130,427 @@ def build_X(lead: dict, columns: list[str], training_features: list[str]) -> pd.
     return X.reindex(columns=training_features, fill_value=0)
 
 
-def build_X_batch(df_subset: pd.DataFrame, training_features: list[str]) -> pd.DataFrame:
-    X = pd.get_dummies(df_subset[CLF_INPUT_COLS], columns=["industry", "country", "source"])
-    for col in ["demo_requested", "decision_maker_contacted"]:
-        if col in X.columns:
-            X[col] = X[col].astype(int)
-    return X.reindex(columns=training_features, fill_value=0)
+@st.cache_data
+def cluster_archetype_map(_df, _clusterer) -> dict:
+    """Mapea cluster_id → arquetipo dominante."""
+    rows = []
+    for _, row in _df.iterrows():
+        X = build_X(row.to_dict(), REG_INPUT_COLS, _clusterer["feature_names"])
+        Xs = _clusterer["scaler"].transform(X)
+        rows.append({"cluster": int(_clusterer["model"].predict(Xs)[0]),
+                     "archetype": row["lead_segment_truth"]})
+    df_clu = pd.DataFrame(rows)
+    return df_clu.groupby("cluster")["archetype"].agg(lambda s: s.mode().iloc[0]).to_dict()
 
-
-@st.cache_data(show_spinner=False)
-def llm_score_lead(_client, lead_id: str, description: str) -> int:
-    desc = description if isinstance(description, str) and description.strip() else "(sin descripción)"
-    resp = _client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content":
-            "Eres un analista comercial B2B en Cañadata. Estima la probabilidad "
-            f"(0-100) de que esta empresa convierta. Sólo el número.\n\nDescripción: {desc}"}],
-        max_tokens=10,
-        temperature=0.0,
-    )
-    text = resp.choices[0].message.content.strip()
-    m = re.search(r"\d+", text)
-    return int(m.group(0)) if m else -1
-
-
-def parse_gates(stdout: str) -> list[dict]:
-    """Las líneas tienen forma:
-        ✓ classifier_roc_auc: 0.845 (≥ 0.803 (95% del previo 0.845))
-        ✗ timeseries_mape: 370.32 (≤ 200.0 (umbral inicial · sin previo))
-    El comparador tiene paréntesis anidados; lo capturamos como string."""
-    pattern = re.compile(r"([✓✗])\s+(\w+):\s+([\d.]+)\s+\((.+)\)\s*$", re.MULTILINE)
-    return [
-        {"métrica": name, "valor": round(float(val), 3), "comparador": comparator,
-         "ok": "✓" if flag == "✓" else "✗"}
-        for flag, name, val, comparator in pattern.findall(stdout)
-    ]
-
-
-def run_retrain(dry_run: bool, batch_path: Path | None) -> subprocess.CompletedProcess:
-    cmd = [sys.executable, str(RETRAIN)]
-    if dry_run:
-        cmd.append("--dry-run")
-    if batch_path is not None:
-        cmd += ["--new-batch", str(batch_path)]
-    return subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT)
-
-
-def load_flag() -> dict | None:
-    if FLAG.exists():
-        return json.loads(FLAG.read_text())
-    return None
-
-
-# ── App ────────────────────────────────────────────────────
 
 df = load_data()
-holdout = load_holdout()
 classifier = load_classifier()
 regressor = load_regressor()
 clusterer = load_clusterer()
-timeseries = load_timeseries()
 client = get_openai_client()
+with st.spinner("Mapeando clusters → arquetipos (primera carga, ~2-5 s)…"):
+    cluster_to_archetype = cluster_archetype_map(df, clusterer)
 
-st.title("🚀 Cañadata — Dashboard S3 (final)")
 
-# Stats del último deploy en cabecera
-flag = load_flag()
-if flag:
-    cap = (
-        f"último deploy: **{flag['timestamp']}** · "
-        f"{flag.get('rows_used', '?'):,} filas · "
-        f"AUC clf {flag['gates']['classifier_roc_auc']['metric']:.3f}"
+# ── DEFAULTS para rellenar features que el LLM no extraiga ──
+
+DEFAULTS = {
+    "industry": "SaaS", "company_size": 100, "country": "ES", "source": "organic",
+    "demo_requested": False, "emails_opened": 5, "response_time_hours": 24.0,
+    "n_meetings": 1, "decision_maker_contacted": False, "quoted_acv_eur": 5000.0,
+}
+
+
+# ── Las 5 tools que el LLM puede llamar ─────────────────────
+
+def extract_lead_from_text(text: str) -> dict:
+    """Extrae features estructuradas de una descripción libre del lead.
+
+    Hace una llamada interna al LLM con JSON mode para forzar formato.
+    Es una tool que internamente usa LLM (patrón muy común).
+    """
+    schema_prompt = (
+        "Extrae las features de este lead B2B en JSON con esta forma:\n"
+        '{"industry": "<SaaS|fintech|retail|logistics|healthcare|unknown>",\n'
+        ' "country": "<ES|FR|DE|UK|IT|PT|unknown>",\n'
+        ' "company_size": <int>,\n'
+        ' "source": "<organic|paid|referral|conference|outbound>",\n'
+        ' "demo_requested": <bool>,\n'
+        ' "decision_maker_contacted": <bool>,\n'
+        ' "n_meetings": <int>,\n'
+        ' "emails_opened": <int>,\n'
+        ' "response_time_hours": <float>,\n'
+        ' "quoted_acv_eur": <float>}.\n'
+        "Si un campo no está en el texto, NO lo pongas. Sólo extrae lo explícito o muy implícito."
     )
-    st.caption(cap)
-else:
-    st.caption("modelos del warm-up de pre-class · sin retrain registrado")
+    resp = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": schema_prompt},
+            {"role": "user", "content": text},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.0,
+    )
+    cost = (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    track_cost(f"extract:{hash(text) % 10000}", cost)
+    extracted = json.loads(resp.choices[0].message.content)
+    # Completa con DEFAULTS lo que falte para que los modelos puedan correr
+    return {**DEFAULTS, **extracted}
 
 
-tab_pred, tab_harness, tab_ship = st.tabs(
-    ["🔍 Predicciones", "📊 Harness", "🚀 Ship it"]
+def predict_conversion(lead: dict) -> dict:
+    """P(convertir) del clasificador entrenado."""
+    X = build_X(lead, CLF_INPUT_COLS, classifier["feature_names"])
+    proba = float(classifier["model"].predict_proba(X)[0, 1])
+    return {"probability": round(proba, 3), "interpretation": f"{int(proba*100)}% de probabilidad de firmar"}
+
+
+def predict_acv(lead: dict) -> dict:
+    """ACV estimado en euros del regresor."""
+    X = build_X(lead, REG_INPUT_COLS, regressor["feature_names"])
+    acv = float(np.exp(regressor["model"].predict(X))[0])
+    return {"acv_eur": round(acv, 0), "interpretation": f"{int(acv):,} € estimados de contrato anual"}
+
+
+def get_archetype(lead: dict) -> dict:
+    """Arquetipo del clusterer entrenado."""
+    X = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
+    Xs = clusterer["scaler"].transform(X)
+    cluster_id = int(clusterer["model"].predict(Xs)[0])
+    archetype = cluster_to_archetype.get(cluster_id, "unknown")
+    return {"cluster_id": cluster_id, "archetype": archetype}
+
+
+def draft_outreach_email(lead: dict, tone: str = "profesional") -> dict:
+    """Redacta un email corto de outreach para el lead. Tool bonus de dashboard_v3."""
+    resp = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": (
+                f"Redacta un email corto de outreach en castellano, tono {tone}. "
+                "5-7 líneas máximo. Saludo, contexto (cita una señal concreta del lead), "
+                "valor de Cañadata (1 frase), CTA (sugerir 30 min de llamada). Sin firma."
+            )},
+            {"role": "user", "content": f"Lead: {json.dumps(lead, default=str, ensure_ascii=False)}"},
+        ],
+        temperature=0.4,
+    )
+    cost = (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+    track_cost(f"email:{hash(json.dumps(lead, default=str)) % 10000}", cost)
+    return {"email": resp.choices[0].message.content}
+
+
+def find_similar_leads(lead: dict, k: int = 3) -> dict:
+    """Top-k leads históricos más parecidos por distancia euclídea sobre features escaladas."""
+    X_new = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
+    Xs_new = clusterer["scaler"].transform(X_new)[0]
+    # Build matrix for all historical leads
+    rows = []
+    for _, row in df.iterrows():
+        X_hist = build_X(row.to_dict(), REG_INPUT_COLS, clusterer["feature_names"])
+        Xs_hist = clusterer["scaler"].transform(X_hist)[0]
+        dist = float(np.linalg.norm(Xs_new - Xs_hist))
+        rows.append({
+            "lead_id": row["lead_id"],
+            "company_name": row.get("company_name", ""),
+            "industry": row["industry"],
+            "country": row["country"],
+            "company_size": int(row["company_size"]),
+            "converted": bool(row["converted"]),
+            "distance": dist,
+        })
+    rows.sort(key=lambda r: r["distance"])
+    top = rows[:k]
+    summary = {
+        "k": k,
+        "matches": [{k_: v for k_, v in r.items() if k_ != "distance"} for r in top],
+        "conversion_rate_among_similar": round(sum(r["converted"] for r in top) / max(len(top), 1), 2),
+    }
+    return summary
+
+
+# ── Schemas de las tools (lo que el LLM "ve") ───────────────
+
+TOOL_SCHEMAS = {
+    "extract_lead_from_text": {
+        "type": "function",
+        "function": {
+            "name": "extract_lead_from_text",
+            "description": "Extrae features estructuradas (industry, country, company_size, demo_requested, etc.) de la descripción libre de un lead B2B. ÚSALA SIEMPRE COMO PRIMER PASO cuando te pasen un lead nuevo en texto libre.",
+            "parameters": {
+                "type": "object",
+                "properties": {"text": {"type": "string", "description": "Descripción libre del lead"}},
+                "required": ["text"],
+            },
+        },
+    },
+    "predict_conversion": {
+        "type": "function",
+        "function": {
+            "name": "predict_conversion",
+            "description": "Devuelve P(convertir) usando el clasificador entrenado sobre 700 leads históricos de Cañadata. Más fiable que tu corazonada.",
+            "parameters": {
+                "type": "object",
+                "properties": {"lead": {"type": "object", "description": "dict de features estructuradas del lead"}},
+                "required": ["lead"],
+            },
+        },
+    },
+    "predict_acv": {
+        "type": "function",
+        "function": {
+            "name": "predict_acv",
+            "description": "Devuelve el ACV (Annual Contract Value) estimado en euros usando el regresor entrenado.",
+            "parameters": {
+                "type": "object",
+                "properties": {"lead": {"type": "object"}},
+                "required": ["lead"],
+            },
+        },
+    },
+    "get_archetype": {
+        "type": "function",
+        "function": {
+            "name": "get_archetype",
+            "description": "Devuelve el arquetipo (quick_mover, strategic, tire_kicker) del clusterer entrenado.",
+            "parameters": {
+                "type": "object",
+                "properties": {"lead": {"type": "object"}},
+                "required": ["lead"],
+            },
+        },
+    },
+    "find_similar_leads": {
+        "type": "function",
+        "function": {
+            "name": "find_similar_leads",
+            "description": "Devuelve los k leads históricos más similares con sus desenlaces reales (firmaron o no). Útil para anclar la recomendación en casos pasados concretos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lead": {"type": "object"},
+                    "k": {"type": "integer", "default": 3},
+                },
+                "required": ["lead"],
+            },
+        },
+    },
+    "draft_outreach_email": {
+        "type": "function",
+        "function": {
+            "name": "draft_outreach_email",
+            "description": "Redacta un email corto de outreach personalizado para el lead. Úsala SÓLO si el usuario lo pide explícitamente ('redacta un email', 'escríbeme el primer contacto', etc.).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lead": {"type": "object"},
+                    "tone": {"type": "string", "description": "profesional / cercano / breve"},
+                },
+                "required": ["lead"],
+            },
+        },
+    },
+}
+
+
+# ── TOOL_FUNCS: registro de qué tools están ACTIVAS ─────────
+#
+# El bot SOLO ve las tools que están aquí registradas. Empieza
+# con extract_lead_from_text activa. Tu trabajo: encender las
+# otras cuatro, una por hueco. Cada hueco es UNA LÍNEA.
+#
+# Cuando rellenes HUECO 1, refresca el navegador. Pega un lead.
+# Verás que el bot ahora tiene una capacidad nueva.
+
+TOOL_FUNCS = {
+    "extract_lead_from_text": extract_lead_from_text,
+    "predict_conversion": predict_conversion,
+    "predict_acv": predict_acv,
+    "get_archetype": get_archetype,
+    "find_similar_leads": find_similar_leads,
+    "draft_outreach_email": draft_outreach_email,  # tool bonus de dashboard_v3
+}
+
+
+# Sólo exponemos al LLM las tools que están activas en TOOL_FUNCS.
+TOOLS = [TOOL_SCHEMAS[name] for name in TOOL_FUNCS if name in TOOL_SCHEMAS]
+
+
+# ── SYSTEM_PROMPT del asistente ─────────────────────────────
+
+SYSTEM_PROMPT = (
+    "Eres un asistente comercial de Cañadata, una SaaS B2B. Tu trabajo es ayudar al comercial "
+    "a analizar leads nuevos.\n\n"
+    "Cuando el usuario te pase un lead (descripción libre), sigue este flujo SECUENCIAL:\n"
+    "1. Llama `extract_lead_from_text` con el texto completo del usuario. Espera el resultado.\n"
+    "2. Llama `predict_conversion` con el dict de features que devolvió extract.\n"
+    "3. Llama `predict_acv` con el mismo dict.\n"
+    "4. Llama `get_archetype` con el mismo dict.\n"
+    "5. Llama `find_similar_leads` con el dict + k=3.\n"
+    "6. Resume en bullets con: P(convertir), ACV, arquetipo, 3 leads parecidos y sus desenlaces, "
+    "   y UNA recomendación accionable.\n\n"
+    "Reglas:\n"
+    "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar.\n"
+    "- Si la descripción es pobre, USA igualmente los defaults que devuelve extract. NO pidas confirmación.\n"
+    "- Sólo llama `draft_outreach_email` si el usuario lo pide explícitamente.\n\n"
+    "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
 )
 
 
-# ──────────────────────────────────────────────────────────
-# Tab 1 — Predicciones por lead (heredado de dashboard_v2)
-# ──────────────────────────────────────────────────────────
+# ── Loop de tool calling ────────────────────────────────────
 
-with tab_pred:
-    with st.sidebar:
-        st.subheader("Lead")
-        lead_id = st.selectbox("lead_id", df["lead_id"].tolist())
+def run_assistant(user_message: str, history: list[dict]) -> tuple[str, list[dict]]:
+    """Ejecuta el bucle de function calling hasta que el LLM responda sin tool_calls.
 
-    lead = df[df["lead_id"] == lead_id].iloc[0].to_dict()
+    Devuelve (respuesta_final_texto, lista_de_tool_calls_hechas_para_debug).
+    """
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history, {"role": "user", "content": user_message}]
+    tool_calls_log = []
+    total_cost = 0.0
 
-    st.subheader("Datos del lead")
-    visible = ["company_name", "industry", "company_size", "country", "source",
-               "demo_requested", "emails_opened", "response_time_hours",
-               "n_meetings", "decision_maker_contacted", "quoted_acv_eur"]
-    st.json({k: lead[k] for k in visible})
-    desc = lead.get("company_description")
-    if isinstance(desc, str) and desc:
-        st.caption(f"_{desc}_")
+    for _ in range(10):
+        kwargs = {"model": MODEL, "messages": messages, "temperature": 0.2}
+        if TOOLS:
+            kwargs["tools"] = TOOLS
+            kwargs["tool_choice"] = "auto"
+            kwargs["parallel_tool_calls"] = False  # secuencial: las tools dependen entre sí
+        resp = client.chat.completions.create(**kwargs)
+        total_cost += (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
+        msg = resp.choices[0].message
 
-    col_clf, col_reg, col_clu, col_llm = st.columns(4)
+        if not msg.tool_calls:
+            messages.append({"role": "assistant", "content": msg.content})
+            track_cost(f"chat:{hash(user_message) % 10000}", total_cost)
+            return msg.content, tool_calls_log
 
-    with col_clf:
-        st.subheader("🎯 Clasificador")
-        X_clf = build_X(lead, CLF_INPUT_COLS, classifier["feature_names"])
-        proba_clf = classifier["model"].predict_proba(X_clf)[0, 1]
-        st.metric("P(convertir)", f"{proba_clf:.1%}")
-        st.caption(f"realidad: `{lead['converted']}`")
+        messages.append({
+            "role": "assistant",
+            "content": msg.content,
+            "tool_calls": [{"id": tc.id, "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                           for tc in msg.tool_calls],
+        })
 
-    with col_reg:
-        st.subheader("💰 Regresor")
-        X_reg = build_X(lead, REG_INPUT_COLS, regressor["feature_names"])
-        acv_pred = float(np.exp(regressor["model"].predict(X_reg))[0])
-        st.metric("ACV", f"{acv_pred:,.0f} €")
-
-    with col_clu:
-        st.subheader("🔮 Cluster")
-        X_clu = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
-        cid = int(clusterer["model"].predict(clusterer["scaler"].transform(X_clu))[0])
-        st.metric("Cluster", f"#{cid}")
-        st.caption(f"plantado: `{lead['lead_segment_truth']}`")
-
-    with col_llm:
-        st.subheader("🤖 LLM")
-        if isinstance(desc, str) and desc.strip():
-            with st.spinner(""):
-                score = llm_score_lead(client, lead_id, desc)
-            if score >= 0:
-                st.metric("P(convertir)", f"{score}%")
-                st.caption("zero-shot")
-        else:
-            st.warning("Sin desc")
-
-    st.divider()
-    st.subheader("📈 Histórico + forecast (cono)")
-    history = timeseries["history"]
-    ts_m = timeseries["model"]   # Prophet
-    future = ts_m.make_future_dataframe(periods=6, freq="MS")
-    fc = ts_m.predict(future)
-    forecast = fc.set_index("ds")["yhat"].iloc[-6:]
-    yhat_lower = fc.set_index("ds")["yhat_lower"].iloc[-6:]
-    yhat_upper = fc.set_index("ds")["yhat_upper"].iloc[-6:]
-
-    import plotly.graph_objects as go
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=history.index, y=history.values, name="histórico", line=dict(color="steelblue")))
-    fig.add_trace(go.Scatter(x=forecast.index, y=forecast.values, name="forecast", line=dict(color="darkorange")))
-    fig.add_trace(go.Scatter(
-        x=list(forecast.index) + list(forecast.index[::-1]),
-        y=list(yhat_upper) + list(yhat_lower[::-1]),
-        fill="toself", fillcolor="rgba(255,165,0,0.15)",
-        line=dict(color="rgba(0,0,0,0)"),
-        name="banda 80%",
-    ))
-    fig.update_layout(height=260, margin=dict(l=0, r=0, t=20, b=0))
-    st.plotly_chart(fig, width='stretch')
-    st.caption(f"MAPE en hold-out: {timeseries.get('validation_mape', 0):.1f}%")
-
-
-# ──────────────────────────────────────────────────────────
-# Tab 2 — Comparison harness
-# ──────────────────────────────────────────────────────────
-
-with tab_harness:
-    st.subheader("Holdout: clasificador vs LLM zero-shot")
-    n = st.slider("Leads a evaluar", 5, len(holdout), 20, 5, key="harness_n")
-
-    if st.button("Correr harness", type="primary"):
-        sample = holdout.head(n).copy()
-        # Normaliza para que build_X no rompa
-        sample["industry"] = sample["industry"].astype("string").str.lower().map({
-            "saas": "SaaS", "fintech": "fintech", "retail": "retail",
-            "logistics": "logistics", "healthcare": "healthcare",
-        }).fillna("unknown")
-        sample["country"] = sample["country"].astype("string").str.upper().str.strip()
-        sample.loc[~sample["country"].isin(["ES","FR","DE","UK","IT","PT"]), "country"] = "unknown"
-        sample["source"] = sample["source"].astype("string").str.lower().map({
-            "organic": "organic", "paid": "paid", "referral": "referral",
-            "conference": "conference", "outbound": "outbound",
-        }).fillna("unknown")
-        for col in ["company_size", "emails_opened", "response_time_hours", "quoted_acv_eur"]:
-            sample[col] = pd.to_numeric(sample[col], errors="coerce")
-        sample = sample.fillna({"emails_opened": 0, "response_time_hours": 24,
-                                "quoted_acv_eur": 8000, "company_description": ""})
-        sample["demo_requested"] = sample["demo_requested"].astype(str).str.lower().isin(["true", "1", "yes", "y", "sí"])
-        sample["decision_maker_contacted"] = sample["decision_maker_contacted"].astype(str).str.lower().isin(["true", "1", "yes", "y", "sí"])
-
-        t0 = time.time()
-        X = build_X_batch(sample, classifier["feature_names"])
-        proba_clf = classifier["model"].predict_proba(X)[:, 1]
-        t_clf = time.time() - t0
-
-        prog = st.progress(0.0, text="LLM zero-shot…")
-        proba_llm = []
-        t0 = time.time()
-        for i, row in enumerate(sample.itertuples()):
-            score = llm_score_lead(client, row.lead_id, row.company_description)
-            proba_llm.append((score if score >= 0 else 50) / 100.0)
-            prog.progress((i + 1) / n)
-        prog.empty()
-        t_llm = time.time() - t0
-        proba_llm = np.array(proba_llm)
-
-        y_true = sample["converted"].astype(int).values
-        auc_clf = roc_auc_score(y_true, proba_clf) if len(set(y_true)) > 1 else float("nan")
-        auc_llm = roc_auc_score(y_true, proba_llm) if len(set(y_true)) > 1 else float("nan")
-
-        # Bootstrap CI — humildad estadística con muestras pequeñas
-        def _boot_ci(y, p, n_boot=1000, seed=0):
-            rng = np.random.default_rng(seed)
-            m = len(y)
-            aucs = []
-            for _ in range(n_boot):
-                idx = rng.choice(m, size=m, replace=True)
-                if len(set(y[idx])) > 1:
-                    aucs.append(roc_auc_score(y[idx], p[idx]))
-            a = np.array(aucs)
-            return np.percentile(a, 2.5), np.percentile(a, 97.5)
-
-        if not np.isnan(auc_clf):
-            clf_lo, clf_hi = _boot_ci(y_true, proba_clf)
-            llm_lo, llm_hi = _boot_ci(y_true, proba_llm)
-        else:
-            clf_lo = clf_hi = llm_lo = llm_hi = float("nan")
-
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric(
-            "AUC clasificador",
-            f"{auc_clf:.3f}",
-            help=f"95% CI: [{clf_lo:.3f}, {clf_hi:.3f}]",
-        )
-        c2.metric(
-            "AUC LLM zero-shot",
-            f"{auc_llm:.3f}",
-            help=f"95% CI: [{llm_lo:.3f}, {llm_hi:.3f}]",
-        )
-        c3.metric("Latencia clf", f"{t_clf*1000:.0f} ms")
-        c4.metric("Latencia LLM", f"{t_llm/n:.2f} s/lead")
-
-        if not np.isnan(clf_lo):
-            ci_overlap = max(clf_lo, llm_lo) <= min(clf_hi, llm_hi)
-            if ci_overlap:
-                st.warning(
-                    f"⚠ Los CIs se solapan ({clf_lo:.3f}-{clf_hi:.3f} vs "
-                    f"{llm_lo:.3f}-{llm_hi:.3f}). Con {n} leads no puedes "
-                    "afirmar que uno sea mejor. Sube el slider o acepta el ruido."
-                )
-
-        st.bar_chart(pd.DataFrame(
-            {"clasificador": [auc_clf], "LLM": [auc_llm]}, index=["ROC-AUC"]
-        ), height=220)
-
-        st.dataframe(pd.DataFrame({
-            "lead_id": sample["lead_id"].values,
-            "industry": sample["industry"].values,
-            "P_clf": proba_clf.round(3),
-            "P_LLM": proba_llm.round(3),
-            "convirtió": y_true.astype(bool),
-            "arquetipo": sample["lead_segment_truth"].values,
-        }), width='stretch', hide_index=True)
-
-        # Threshold + matriz de confusión + EV
-        st.divider()
-        st.subheader("Threshold + valor esperado")
-        threshold = st.slider("Threshold", 0.0, 1.0, 0.5, 0.05, key="harness_thr")
-
-        def _ev(y, p, thr, gain=5_000, cost=5):
-            pred = p >= thr
-            tp = int(((pred == 1) & (y == 1)).sum())
-            fp = int(((pred == 1) & (y == 0)).sum())
-            return tp, fp, tp * gain - (tp + fp) * cost
-
-        tp_c, fp_c, ev_c = _ev(y_true, proba_clf, threshold)
-        tp_l, fp_l, ev_l = _ev(y_true, proba_llm, threshold)
-
-        cm1, cm2, cm3, cm4 = st.columns(4)
-        cm1.metric("TP clf", tp_c, help="Predicho convertir y convirtió")
-        cm2.metric("FP clf", fp_c, help="Predicho convertir, no convirtió")
-        cm3.metric("EV clasificador", f"{ev_c:,} €")
-        cm4.metric("EV LLM", f"{ev_l:,} €")
-        st.caption(
-            "Gain = 5.000€/firma, coste = 5€/llamada. Mueve el slider hasta "
-            "que el EV deje de subir. **AUC mide saber, EV mide cobrar.**"
-        )
-
-
-# ──────────────────────────────────────────────────────────
-# Tab 3 — Ship it
-# ──────────────────────────────────────────────────────────
-
-with tab_ship:
-    st.subheader("Estado actual de los modelos")
-    flag = load_flag()
-    if flag:
-        cols = st.columns(len(flag.get("gates", {})) + 1)
-        cols[0].metric("Último deploy", flag["timestamp"])
-        for i, (name, info) in enumerate(flag.get("gates", {}).items(), start=1):
-            emoji = "✓" if info["passed"] else "✗"
-            # Comparador exacto del JSON (lower-is-better → "≤", higher → "≥").
-            comparador = info.get("comparator") or f"≥ {info['threshold']}"
-            cols[i].metric(name.replace("_", " "), f"{info['metric']:.3f}",
-                           f"{emoji} {comparador}")
-    else:
-        st.info("Sin retrain registrado. Modelos del warm-up.")
-
-    st.divider()
-    st.subheader("Sube un batch nuevo")
-    uploaded = st.file_uploader("CSV de leads nuevos", type="csv")
-    if uploaded is not None:
-        NEW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        NEW_BATCH.write_bytes(uploaded.getvalue())
-        st.success(f"Guardado en {NEW_BATCH.relative_to(ROOT)}")
-
-    if NEW_BATCH.exists():
-        df_new = pd.read_csv(NEW_BATCH)
-        with st.expander(f"Batch actual ({len(df_new)} filas)"):
-            st.dataframe(df_new.head(10), width='stretch')
-    else:
-        st.caption("No hay batch nuevo. Si no subes uno, retrain reentrena sólo con histórico.")
-
-    st.divider()
-    st.subheader("Reentrenar (dry-run)")
-
-    if "ship_dry" not in st.session_state:
-        st.session_state.ship_dry = None
-
-    batch_for_retrain = NEW_BATCH if NEW_BATCH.exists() else None
-
-    if st.button("Reentrenar y evaluar gates", type="primary"):
-        with st.spinner("Reentrenando…"):
-            result = run_retrain(dry_run=True, batch_path=batch_for_retrain)
-        rows = parse_gates(result.stdout)
-        st.session_state.ship_dry = {
-            "rows": rows,
-            "passed": result.returncode == 0 and all(r["ok"] == "✓" for r in rows),
-            "stdout": result.stdout,
-        }
-
-    if st.session_state.ship_dry is not None:
-        if st.session_state.ship_dry["rows"]:
-            st.dataframe(pd.DataFrame(st.session_state.ship_dry["rows"]),
-                         width='stretch', hide_index=True)
-        if st.session_state.ship_dry["passed"]:
-            st.success("Todos los gates pasan. Listo para deploy.")
-        else:
-            st.error("Algún gate falló.")
-        with st.expander("Output completo"):
-            st.code(st.session_state.ship_dry["stdout"], language="text")
-
-    st.divider()
-    st.subheader("Deploy")
-    ready = st.session_state.ship_dry is not None and st.session_state.ship_dry["passed"]
-    if not ready:
-        st.info("Pasa primero el dry-run con todos los gates en verde.")
-    else:
-        confirm = st.checkbox("Confirmo: reemplazar `session1/models/`")
-        if confirm and st.button("⚠ DEPLOY", type="primary"):
-            with st.spinner("Deploy real…"):
-                result = run_retrain(dry_run=False, batch_path=batch_for_retrain)
-            if result.returncode == 0:
-                st.success("✓ Deploy hecho. Recargando modelos…")
-                st.cache_resource.clear()
-                st.cache_data.clear()
-                st.balloons()
-                time.sleep(0.5)
-                st.rerun()
+        for tc in msg.tool_calls:
+            name = tc.function.name
+            args = json.loads(tc.function.arguments)
+            if name in TOOL_FUNCS:
+                try:
+                    result = TOOL_FUNCS[name](**args)
+                except Exception as e:
+                    result = {"error": f"{type(e).__name__}: {e}"}
             else:
-                st.error("Falló el deploy:")
-                st.code(result.stdout, language="text")
+                result = {"error": f"Tool '{name}' no está registrada en TOOL_FUNCS. Mira los huecos de paso_7.py."}
+            tool_calls_log.append({"tool": name, "args": args, "result": result})
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": json.dumps(result, default=str, ensure_ascii=False),
+            })
+
+    track_cost(f"chat:{hash(user_message) % 10000}", total_cost)
+    return "(El bot dio demasiadas vueltas sin acabar. Reformula la pregunta.)", tool_calls_log
+
+
+# ── UI ──────────────────────────────────────────────────────
+
+st.title("🚀 Cañadata · S3 reveal · 6 tools activas")
+st.caption("Versión completa de paso_7. Las 4 huecos rellenos + `draft_outreach_email` añadida como demo.")
+
+with st.sidebar:
+    st.markdown("### Estado del bot")
+    st.markdown(f"**Tools activas**: {len(TOOL_FUNCS)} de {len(TOOL_SCHEMAS)}")
+    for name in TOOL_SCHEMAS:
+        emoji = "✅" if name in TOOL_FUNCS else "🔒"
+        st.markdown(f"{emoji} `{name}`")
+    if len(TOOL_FUNCS) < len(TOOL_SCHEMAS):
+        st.info("Rellena los huecos en `paso_7.py` para activar las demás tools.")
+
+render_cost_sidebar()
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+    st.session_state.tool_logs = []
+
+# Render historial
+for i, msg in enumerate(st.session_state.messages):
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if msg["role"] == "assistant" and i // 2 < len(st.session_state.tool_logs):
+            logs = st.session_state.tool_logs[i // 2]
+            if logs:
+                with st.expander(f"🔧 {len(logs)} tool calls"):
+                    for log in logs:
+                        st.markdown(f"**{log['tool']}** ← `{json.dumps(log['args'], default=str)[:120]}`")
+                        st.code(json.dumps(log["result"], default=str, ensure_ascii=False, indent=2)[:600], language="json")
+
+# Input
+if prompt := st.chat_input("Pega aquí un lead o haz una pregunta…"):
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    with st.chat_message("assistant"):
+        with st.spinner("Pensando…"):
+            history = st.session_state.messages.copy()
+            response, logs = run_assistant(prompt, history)
+        st.markdown(response)
+        if logs:
+            with st.expander(f"🔧 {len(logs)} tool calls"):
+                for log in logs:
+                    st.markdown(f"**{log['tool']}** ← `{json.dumps(log['args'], default=str)[:120]}`")
+                    st.code(json.dumps(log["result"], default=str, ensure_ascii=False, indent=2)[:600], language="json")
+
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.session_state.tool_logs.append(logs)
+
+
+# ── 🚀 Si te quedas con ganas: añade tu propia tool ─────────
+
+st.divider()
+with st.expander("🚀 Si te quedas con ganas: añade tu propia tool"):
+    st.markdown("""
+Tres sitios, un patrón:
+
+1. **Define la función Python** (arriba en este archivo):
+   ```python
+   def draft_outreach_email(lead: dict, tone: str = "profesional") -> dict:
+       resp = client.chat.completions.create(
+           model=MODEL,
+           messages=[{"role": "user", "content": f"Redacta un email {tone} para {lead}"}],
+       )
+       return {"email": resp.choices[0].message.content}
+   ```
+
+2. **Añade el schema** a `TOOL_SCHEMAS`:
+   ```python
+   "draft_outreach_email": {
+       "type": "function",
+       "function": {
+           "name": "draft_outreach_email",
+           "description": "Redacta un email de outreach para un lead.",
+           "parameters": {
+               "type": "object",
+               "properties": {
+                   "lead": {"type": "object"},
+                   "tone": {"type": "string"},
+               },
+               "required": ["lead"],
+           },
+       },
+   },
+   ```
+
+3. **Regístrala** en `TOOL_FUNCS`:
+   ```python
+   "draft_outreach_email": draft_outreach_email,
+   ```
+
+Recarga el navegador y pídele al bot "redacta un email para este lead". Ideas para tu empresa:
+- `lookup_in_crm(lead_id)`: enriquece con histórico real de tu CRM.
+- `search_web(company_name)`: verifica lo que dice la descripción.
+- `analyze_competitor(industry)`: devuelve el mercado comparable.
+- `score_call_priority(lead)`: combina P(convertir) + ACV + tiempo de respuesta esperado.
+
+Function calling escala bien hasta ~20 tools por bot. Más allá, conviene partir en sub-asistentes especializados.
+""")

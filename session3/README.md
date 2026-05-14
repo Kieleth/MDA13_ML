@@ -1,112 +1,84 @@
-# Sesión 3 · Medir, validar, desplegar
+# Sesión 3 · Asistente con tools, skill compartible y retrain manual
 
-S1 entrenaste herramientas. S2 las pusiste detrás de un LLM. Hoy mides si todo eso justifica su coste, montas puertas de calidad, y construyes el flujo entero del lunes ("entran 150 leads nuevos, ¿cómo redesplegamos?").
+S1 entrenaste 4 modelos. S2 le diste herramientas al LLM. Hoy tres cosas:
 
-## ⚠ Si en S2 te quedaste atascado, lee esto primero
+1. **paso_7**: un asistente comercial real en Streamlit. Pegas un lead, el LLM llama a tus modelos como tools (function calling), te da un veredicto. Tú lo activas pieza a pieza rellenando 4 huecos diminutos.
+2. **paso_8**: el mismo asistente, empaquetado como un *skill* que puedes pegar en Claude Project o ChatGPT. **Sin terminal**, sin Python. Para compartir con tu equipo.
+3. **paso_9**: una guía sobre qué hacer cuando dentro de 3 meses tengas leads nuevos y quieras reentrenar.
 
-S3 hereda los conceptos de S2 (los 3 modos LLM: zero-shot, analista, operador) sin recap dentro de los pasos. Si no te quedó claro qué hace cada uno:
+---
 
-- **Opción rápida (5 min)**: abre `session2/exercises/paso_6.py` y mira el `SYSTEM_PROMPT_OPERADOR` pre-escrito. Eso es lo que el LLM "ve" al actuar como operador.
-- **Opción visual (5 min)**: lanza `streamlit run session2/reference_code/dashboard_v2.py` y prueba la vista de comparación analista vs operador con la misma pregunta.
-- **Opción cero**: hoy el "LLM zero-shot" es lo único que vas a tocar contra `paso_7` (vs el clasificador clásico). Con eso te alcanza para empezar. Los otros 2 modos llegarán al final cuando lance `dashboard_v3.py` como reveal.
-
-## Conceptos que se asumen en S3 (warm-up rápido)
-
-Si alguno te suena flojo, expande el bloque "🧯 Warm-up: 5 conceptos en 10 minutos" al inicio de `paso_7.py`. Resumen aquí también:
-
-- **AUC**: mide la calidad del ranking de un modelo. Tomas dos leads cualesquiera, uno que convirtió y otro que no. Si la puntuación del modelo para el que convirtió es más alta, el par suma 1. AUC es la media sobre todos los pares. 0.5 equivale al azar, 1.0 es ordenación perfecta. No es accuracy.
-- **Train / test / holdout**: train para ajustar el modelo, test para iterar durante el desarrollo, holdout es el examen final que ningún modelo ha visto. Hoy estrenamos el holdout.
-- **Bootstrap**: 1000 remuestreos con reemplazo de los `n` leads te dan un intervalo de confianza al 95%. Si los IC de dos modelos se solapan, no puedes afirmar cuál es mejor.
-- **Vectorización**: el clasificador procesa los 50 leads en una sola operación matricial (~24 ms). El LLM hace una llamada HTTP por lead (~650 ms cada una). Por lead la diferencia es de unos 1300×.
-- **Unidades**: hoy el coste se muestra en céntimos y en euros directos. Si ves `m€` en algún sitio (heredado de S2), son milésimas de euro, no millones.
-
-## Antes de empezar (branch hygiene)
-
-Si tienes cambios sin commitear de S2 en tu working tree (paso_4/5/6 con huecos rellenados), commitea o stashea antes de cambiar de rama:
+## paso_7 · El dashboard con tools
 
 ```sh
-git status                 # ¿hay rojo en session2/?
-git stash push -m "s2_test" # opción A: guardar para luego
-# o:
-git checkout -- session2/  # opción B: descartar
+streamlit run session3/exercises/paso_7.py
 ```
 
-Los archivos `.pkl` de S1 (`session1/models/*.pkl`) están en `.gitignore`. **Persisten en tu working tree al cambiar de rama** si ya los entrenaste en S1. Si has hecho clone fresco hoy, primero corre `pre_class/1_classical_models.ipynb` para regenerarlos.
+Chat estilo ChatGPT, pero conectado a tus modelos. El bot empieza casi mudo: sólo sabe extraer features de un texto libre. Tú le enciendes capacidades una a una:
 
-## Orden
+- **HUECO 1**: enciende `predict_conversion` (el clasificador).
+- **HUECO 2**: enciende `predict_acv` (el regresor).
+- **HUECO 3**: enciende `get_archetype` (el clusterer).
+- **HUECO 4**: enciende `find_similar_leads` (KNN sobre features escaladas).
 
-1. `exercises/paso_7.py` · **Comparison harness** sobre 100 leads del holdout. Clasificador clásico vs LLM zero-shot, con AUC, bootstrap CI, coste y latencia. **TOGETHER**: Luis tipea contigo.
-2. `exercises/paso_8.py` · **Quality gates** alrededor de `retrain.py`. Dry-run, gates relativos al modelo en producción, deploy real tras confirmación. **SUPPORTED**: huecos más grandes, Luis apoya.
-3. `exercises/paso_9.py` · **Ship-it pipeline**. Upload CSV → retrain → gates → deploy → reload del dashboard. **INDEPENDENT**: lo escribes tú, Luis mira de lejos.
+Cada hueco es una línea. Tras rellenar uno, recargas y ves que el bot tiene una capacidad nueva.
 
-Cada `.py` se lanza con:
+Lleva una sección final **🚀 Si te quedas con ganas: añade tu propia tool** con un ejemplo (`draft_outreach_email`) y lista de ideas para tu empresa.
 
-```sh
-streamlit run session3/exercises/paso_N.py
-```
-
-## Si peta al arrancar
+### Si peta al arrancar
 
 | Síntoma | Causa | Fix |
 |---|---|---|
-| `NameError: name '___' is not defined` | huecos sin rellenar | búscalos en el código (`grep -n "___" session3/exercises/paso_N.py`) |
-| `Falta data/canadata_holdout.csv` | falta el dataset reservado | clona el repo limpio o coge `canadata_holdout.csv` del kit |
-| `Falta session1/models/X.pkl` | pre-clase incompleta o `git checkout` sin S1 | corre `pre_class/1_classical_models.ipynb` |
-| `No existe session3/retrain.py` | no estás en la rama `session-3` | `git checkout session-3` |
-| `OPENAI_API_KEY no está` | falta `.env` | crea `.env` en la raíz con `OPENAI_API_KEY=sk-...` |
-| `No se pudo contactar OpenAI` | red rota o key inválida/sin crédito | comprueba red, luego que la key es válida |
-| `Algún gate falló` en dry-run | el modelo nuevo no supera el umbral | mira el output completo del expander; el comparador exacto está al final de cada línea |
+| `Falta data/canadata_leads_clean.csv` | pre-clase incompleta | corre `pre_class/1_classical_models.ipynb` |
+| `Falta session1/models/X.pkl` | pre-clase incompleta | mismo notebook |
+| `OPENAI_API_KEY no está` | falta `.env` | crea `.env` con tu key |
+| `No se pudo contactar OpenAI` | red rota o key inválida | comprueba conexión + key |
 
-## Lo que se mide en paso_7
+---
 
-Sobre 100 leads del holdout (que ningún modelo ha visto):
-- **ROC-AUC** del clasificador clásico vs LLM zero-shot. AUC = probabilidad de que un par random (positivo, negativo) tenga el positivo con score más alto. 0.5 = aleatorio, 1.0 = perfecto.
-- **Bootstrap CI 95%** (1000 remuestreos con reemplazo). Si los intervalos se solapan, NO puedes decir que un modelo gana. Es bootstrap independiente, no pareado (lo más correcto en producción sería pareado o DeLong test).
-- **Coste** total y por predicción, en céntimos y € directos. Para 1000 leads, ~3 céntimos (0.03 €).
-- **Latencia** media. ~650 ms por lead con el LLM, frente a ~24 ms para los 50 leads del clasificador (vectorizado). Por lead son ~1300× de diferencia.
-- **Expected Value** dado un threshold y la economía del negocio (`gain_per_signing`, `cost_per_call`). El AUC mide saber, el EV mide cobrar.
+## paso_8 · El skill compartible
 
-Las columnas `converted` y `lead_segment_truth` del holdout vienen plantadas en pre-class (`pre_class/1_classical_models.ipynb`); son la **ground truth** contra la que se evalúan los modelos.
+Está en `skill/`:
 
-## Quality gates (paso_8)
+- `canadata_lead_advisor.md`: el system prompt completo con contexto de negocio + heurísticas + 3 few-shot examples.
+- `USE_IN_CLAUDE_PROJECT.md`: cómo pegarlo en claude.ai/projects.
+- `USE_IN_CUSTOM_GPT.md`: cómo pegarlo en chat.openai.com/gpts.
 
-`retrain.py` ya está escrito. Tu trabajo en paso_8 es construir la **UI alrededor**:
+Idea: tu colega de Marketing no tiene terminal ni los `.pkl`. Pero sí tiene claude.ai. Le mandas `canadata_lead_advisor.md`, lo pega como instrucciones de un Claude Project, y tiene un asesor decente para sus leads. **Sin sklearn, sin pickles, sin servidor.**
 
-1. Leer el JSON flag del último deploy (`session1/models/_retrained_at.json`).
-2. Lanzar `retrain.py --dry-run` con `subprocess.run`.
-3. Parsear las líneas que imprime (regex tolerante: el comparador entre paréntesis tiene paréntesis anidados).
-4. Si los gates pasan, ofrecer el botón de deploy real.
+El skill tiene 1 hueco simbólico (HUECO 1) donde tú escribes UNA heurística de tu dominio. Eso fuerza la conversación "¿qué sabe MI empresa que un LLM puro no sabría?".
 
-Los gates son **relativos al modelo en producción**, no absolutos. Si el AUC nuevo es <95% del AUC del modelo actual, gate falla y NO se hace swap.
+Pruébalo: pega un lead en el chat del Claude Project y compara la respuesta con la que da `paso_7`. Verás dónde el skill alcanza y dónde necesitas el dashboard local.
 
-## Ship-it (paso_9)
+---
 
-Pipeline completa en una página. File uploader → dry-run → deploy → cache reload. Al terminar, el dashboard (paso_6 o dashboard_v3) ve los modelos nuevos sin reiniciar Streamlit (`st.cache_resource.clear()` + `st.rerun()`).
+## paso_9 · La guía de retrain & validate
+
+Está en `guide/RETRAIN_AND_VALIDATE.md`. Lectura, no código.
+
+Dentro de 3 meses tendrás 150 leads nuevos. La guía cubre:
+
+- Cuándo conviene reentrenar (volumen + tiempo + performance).
+- El flujo completo (junta, limpia, split, entrena, mide, compara, decide).
+- Las 4 métricas explicadas una a una: ROC-AUC, R², ARI, MAPE.
+- La regla del 95%: no degrades más de un 5%.
+- Qué hacer si los gates fallan.
+
+Si quieres ver el flujo AUTOMATIZADO (script Python que lo hace solo + UI Streamlit con file uploader + ship-it pipeline), está todo en la rama `session-3-advanced`. Es más denso pero está pensado para integrarse en CI/CD real.
+
+```sh
+git checkout session-3-advanced
+ls session3/
+```
+
+---
 
 ## El veredicto (cierre de S3)
 
-Al final escribes una frase:
+Una frase, por escrito:
 
-> "Para [mi caso real / Cañadata si no tengo caso propio], desplegaría X porque Y."
+> "Para mi caso real, ¿uso paso_7 (dashboard local con modelos), paso_8 (skill compartible LLM-only), o paso_9 (retrain manual cada N meses)? ¿Por qué?".
 
-Con `X ∈ {LLM solo, LLM con herramientas, herramienta sola, híbrido}`. No hay respuesta correcta; hay decisión articulada. Eso es lo que te llevas.
+No hay respuesta correcta. Hay decisión articulada. Eso es lo que te llevas del taller.
 
-Si no tienes un caso real en mente, usa el de Cañadata: 700 leads/mes con scoring, ACV medio ~9K€, conversión 35-40%. La plantilla con preguntas guiadas está en [`decision_framework.md`](decision_framework.md) (mismo directorio).
-
-## Take-home
-
-`retrain.py` ya tiene el flujo completo (combinar histórico + batch, entrenar 4 modelos, gates, swap atómico). Lee el script con calma cuando quieras montar algo similar en tu trabajo.
-
-## Referencia
-
-`reference_code/dashboard_v3.py` · el dashboard integrado con los 3 modos LLM + harness de comparación + ship-it pipeline. Lo lanza el profesor al final como reveal. Mira aquí si te bloqueas, pero después de intentar tú.
-
-## Para ver el deploy en vivo (paso_8 / paso_9)
-
-El swap atómico del `.pkl` y el reload del dashboard sólo se aprecian si tienes OTRA pestaña abierta con el dashboard ANTES del deploy. Antes de empezar paso_8/paso_9:
-
-```sh
-streamlit run session2/exercises/paso_6.py  # o reference_code/dashboard_v2.py
-```
-
-en una ventana de Chrome aparte. Tras el deploy en paso_8/9, refrescas esa pestaña y ves las predicciones nuevas sin reiniciar Streamlit.
+La plantilla con preguntas guiadas está en [`decision_framework.md`](decision_framework.md) (mismo directorio).
