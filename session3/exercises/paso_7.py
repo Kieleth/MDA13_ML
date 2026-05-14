@@ -498,47 +498,34 @@ if prompt := st.chat_input("Pega aquí un lead o haz una pregunta…"):
 st.divider()
 with st.expander("🚀 Si te quedas con ganas: añade tu propia tool"):
     st.markdown("""
-Tres sitios, un patrón:
+**Cómo añadir una tool nueva (tres sitios, un patrón):**
 
-1. **Define la función Python** (arriba en este archivo):
-   ```python
-   def draft_outreach_email(lead: dict, tone: str = "profesional") -> dict:
-       resp = client.chat.completions.create(
-           model=MODEL,
-           messages=[{"role": "user", "content": f"Redacta un email {tone} para {lead}"}],
-       )
-       return {"email": resp.choices[0].message.content}
-   ```
+1. **Define la función Python** (arriba en este archivo).
+2. **Añade el schema** a `TOOL_SCHEMAS`.
+3. **Regístrala** en `TOOL_FUNCS`.
 
-2. **Añade el schema** a `TOOL_SCHEMAS`:
-   ```python
-   "draft_outreach_email": {
-       "type": "function",
-       "function": {
-           "name": "draft_outreach_email",
-           "description": "Redacta un email de outreach para un lead.",
-           "parameters": {
-               "type": "object",
-               "properties": {
-                   "lead": {"type": "object"},
-                   "tone": {"type": "string"},
-               },
-               "required": ["lead"],
-           },
-       },
-   },
-   ```
+Recarga el navegador. Hecho.
 
-3. **Regístrala** en `TOOL_FUNCS`:
-   ```python
-   "draft_outreach_email": draft_outreach_email,
-   ```
+---
 
-Recarga el navegador y pídele al bot "redacta un email para este lead". Ideas para tu empresa:
-- `lookup_in_crm(lead_id)`: enriquece con histórico real de tu CRM.
-- `search_web(company_name)`: verifica lo que dice la descripción.
-- `analyze_competitor(industry)`: devuelve el mercado comparable.
-- `score_call_priority(lead)`: combina P(convertir) + ACV + tiempo de respuesta esperado.
+**Bonus tracks con código completo en `TEACHER_GUIDE_S3.md` (Anexo I):**
 
-Function calling escala bien hasta ~20 tools por bot. Más allá, conviene partir en sub-asistentes especializados.
+1. 🌐 **Web search en tiempo real** (Tavily): el bot busca en internet noticias o info reciente de la empresa. Free tier 1000 calls/mes en tavily.com.
+
+2. 🔔 **Notificación a Slack** cuando llega un lead caliente: si P(convertir) > 0.7, el bot postea al canal `#hot-leads` por webhook. Sin librerías.
+
+3. 🧬 **Similitud semántica con embeddings**: alternativa a la similitud euclidean actual. Encuentra leads parecidos por contenido de descripción, no por features estructuradas. Casos parecidos en *texto* aunque sean distintos en *números*.
+
+4. 🤖 **Sub-agente de investigación** (el bonus agentic): cuando le pidas "investiga este lead", el bot principal delega a un sub-agente que tiene SU PROPIA conversación interna con SUS propias tools (web_search + razonamiento), y devuelve un brief de 3-5 puntos al bot principal. Patrón de agentes anidados, lo que mueve a los productos LLM modernos.
+
+---
+
+**Otras ideas más cortas (sin código pero accionables):**
+
+- `lookup_in_crm(lead_id)`: trae histórico real desde Salesforce/Hubspot.
+- `analyze_competitor(industry)`: devuelve mercado comparable.
+- `score_call_priority(lead)`: combina P(convertir) + ACV + urgencia en score 1-5.
+- `find_internal_expert(industry)`: busca en Slack/Teams quién en tu empresa sabe del segmento.
+
+Function calling escala bien hasta ~20 tools. Más allá, parte en sub-asistentes especializados (que es justamente lo que hace el Bonus 4).
 """)
