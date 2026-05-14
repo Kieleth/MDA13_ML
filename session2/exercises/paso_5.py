@@ -163,7 +163,31 @@ client = get_openai_client()
 #  La NameError sólo dispara cuando clicas "Preguntar".)
 # ──────────────────────────────────────────────────────────
 def _build_system_prompt() -> str:
-    return _hueco(1, "el system prompt como string con el schema completo de df")
+    SYSTEM_PROMPT = """Eres un analista de datos. Tienes un DataFrame de pandas llamado `df` con datos de leads B2B (Cañadata).
+
+        Columnas: lead_id (str), company_name (str), industry (str ∈ {SaaS, fintech, retail, logistics, healthcare, unknown}), company_size (int), country (str ∈ {ES, FR, DE, UK, IT, PT, unknown}), signup_date (str YYYY-MM-DD), source (str ∈ {organic, paid, referral, conference, outbound}), demo_requested (bool), emails_opened (float), response_time_hours (float), n_meetings (int), decision_maker_contacted (bool), quoted_acv_eur (float), company_description (str), converted (bool), converted_within_days (float, NaN si no convirtió), lead_segment_truth (str ∈ {quick_mover, strategic, tire_kicker}, USA SÓLO PARA EVALUAR, no como feature de modelos supervisados).
+
+        Genera código Python pandas para responder la pregunta del usuario.
+        Termina asignando el resultado a una variable llamada `resultado`.
+        Devuelve SÓLO un bloque ```python ... ```, sin explicación.
+
+        [Few-shot]:
+
+        Imagina que el usuario pregunta: "¿Cuál es la tasa de conversión por industria?"
+        Tu respuesta debería ser algo así:
+        ```python
+            resultado = df.groupby('industry')['converted'].mean()
+        ```
+        pregunta1: XXXXX
+        respuesta1: YYYYYY
+
+        pregunta2: ZZZZZZ
+        respuesta2: WWWWWW
+
+        ...
+        """
+
+    return SYSTEM_PROMPT
 
 
 @st.cache_data(show_spinner=False)
@@ -185,7 +209,14 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
     #       temperature=0.0,   # código determinista
     #   )
     # ──────────────────────────────────────────────────────
-    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con system + user, temperature=0")
+    response = _client.chat.completions.create(
+           model=MODEL,
+           messages=[
+               {"role": "system", "content": system_prompt},
+               {"role": "user", "content": pregunta},
+           ],
+           temperature=0.0,   # código determinista
+       )
 
     cost = (response.usage.prompt_tokens * COST_IN
             + response.usage.completion_tokens * COST_OUT) * USD_TO_EUR
@@ -204,8 +235,8 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
 # usado backticks).
 # ──────────────────────────────────────────────────────────
 def extract_code(text: str) -> str:
-    code = _hueco(3, "extrae el código del bloque ```python ... ``` con re.search")
-    return code
+    match = re.search(r"```(?:python)?\n(.*?)```", text, re.DOTALL)
+    return match.group(1) if match else text.strip()
 
 
 # ── HUECO 4 ────────────────────────────────────────────────
@@ -219,8 +250,9 @@ def extract_code(text: str) -> str:
 # ──────────────────────────────────────────────────────────
 def run_code(code: str, df: pd.DataFrame):
     try:
-        # ← Borra el _hueco(...) y pon tres líneas: ns dict, exec(code, ns), return ns.get("resultado", "(no se asignó)"), None
-        _hueco(4, "tres líneas: ns dict, exec(code, ns), return ns.get('resultado'), None")
+        ns = {"df": df, "pd": pd, "np": np}
+        exec(code, ns)
+        return ns.get("resultado", "(no se asignó `resultado`)"), None
     except Exception as e:
         return None, str(e)
 
@@ -247,13 +279,30 @@ ejemplos = [
     "Distribución de conversiones por mes de signup.",
 ]
 
+#---------
+if "pregunta" not in st.session_state:
+    st.session_state.pregunta = ""
+
 cols = st.columns(len(ejemplos))
-clicked = None
 for i, ej in enumerate(ejemplos):
     if cols[i].button(ej, key=f"ej_{i}", width='stretch'):
-        clicked = ej
+        st.session_state.pregunta = ej
 
-pregunta = st.text_area("O escribe la tuya:", value=clicked or "", height=80)
+# Vincula el text_area a session_state.pregunta con key=.
+# Streamlit lee/escribe esa entrada del diccionario automáticamente.
+pregunta = st.text_area("O escribe la tuya:", key="pregunta", height=80)
+#----------
+
+def tasa_conversion_por_industria(df):
+    """Ejemplo de pregunta → código que el LLM debería generar.
+
+     Pregunta: "¿Cuál es la tasa de conversión por industria?"
+     Código que debería generar el LLM:
+     """
+    resultado = df.groupby('industry')['converted'].mean()
+    return resultado
+
+
 
 if st.button("Preguntar", type="primary", disabled=not pregunta.strip()):
     with st.spinner("LLM redactando código…"):
