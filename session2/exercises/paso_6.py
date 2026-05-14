@@ -301,8 +301,14 @@ def ask_llm_for_code(_client, pregunta: str, system_prompt: str) -> tuple[str, f
     #       temperature=0.0,
     #   )
     # ──────────────────────────────────────────────────────
-    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con system + user, temperature=0")
-
+    response = _client.chat.completions.create(
+            model=MODEL,
+            messages=[
+               {"role": "system", "content": system_prompt},
+               {"role": "user", "content": pregunta},
+           ],
+           temperature=0.0,
+        )
     cost = (response.usage.prompt_tokens * COST_IN
             + response.usage.completion_tokens * COST_OUT) * USD_TO_EUR
     return response.choices[0].message.content, cost
@@ -314,19 +320,18 @@ def extract_code(text: str) -> str:
 
 
 def run_code(code: str, df: pd.DataFrame, mode: str):
-    """Ejecuta `code` en un namespace que depende del modo.
-
-    AQUÍ ESTÁ LA LECCIÓN DE paso_6: lo que cambia entre analista y
-    operador es exactamente qué objetos viven en el namespace de exec().
-    """
-    # ── HUECO 1 ────────────────────────────────────────────
-    # En modo "analista": ns = {"df": df, "pd": pd, "np": np}
-    # En modo "operador": añade al ns: classifier, regressor, clusterer,
-    #     timeseries, build_X, CLF_INPUT_COLS, REG_INPUT_COLS,
-    #     cluster_to_archetype.
-    # Luego: exec(code, ns); return ns.get("resultado", ...)
-    # ──────────────────────────────────────────────────────
-    ns = _hueco(1, "construye el dict de namespace según `mode` (analista vs operador)")
+    if mode == "operador":
+        ns = {
+            "df": df, "pd": pd, "np": np,
+            "classifier": classifier, "regressor": regressor,
+            "clusterer": clusterer, "timeseries": timeseries,
+            "build_X": build_X,
+            "CLF_INPUT_COLS": CLF_INPUT_COLS,
+            "REG_INPUT_COLS": REG_INPUT_COLS,
+            "cluster_to_archetype": cluster_to_archetype,
+        }
+    else:  # analista
+        ns = {"df": df, "pd": pd, "np": np}
 
     try:
         exec(code, ns)
@@ -386,45 +391,42 @@ if st.button("Preguntar (modo OPERADOR)", type="primary", disabled=not pregunta.
             st.write(resultado)
 
 
-# ── HUECO 3 ────────────────────────────────────────────────
-# Vista de comparación: corre la misma pregunta en MODO_ANALISTA y
-# en MODO_OPERADOR, lado a lado. **Muestra el código generado en
-# cada modo** (es lo que entrega el punchline: analista escribe
-# lookup en df, operador llama al modelo entrenado).
-#
-# Patrón:
-#   if st.button("Comparar modos", disabled=not pregunta.strip()):
-#       col_an, col_op = st.columns(2)
-#       with col_an:
-#           st.markdown("### 🧮 Modo analista (sólo df)")
-#           raw_an, cost_an = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_ANALISTA)
-#           track_cost(f"p6-an:{pregunta}", cost_an)
-#           code_an = extract_code(raw_an)
-#           with st.expander("Código generado"):
-#               st.code(code_an, language="python")
-#           res_an, err_an = run_code(code_an, df, "analista")
-#           if err_an: st.error(err_an)
-#           elif isinstance(res_an, (pd.DataFrame, pd.Series)):
-#               st.dataframe(res_an, width='stretch')
-#           else:
-#               st.write(res_an)
-#       with col_op:
-#           st.markdown("### 🧠 Modo operador (df + modelos)")
-#           raw_op, cost_op = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_OPERADOR)
-#           track_cost(f"p6-op:{pregunta}", cost_op)
-#           code_op = extract_code(raw_op)
-#           with st.expander("Código generado"):
-#               st.code(code_op, language="python")
-#           res_op, err_op = run_code(code_op, df, "operador")
-#           # render igual que arriba
-# ──────────────────────────────────────────────────────────
-st.info(
-    "👉 HUECO 3 pendiente: sustituye esta línea por la vista de comparación "
-    "(sigue el patrón de la pista de arriba).\n\n"
-    "Aquí contrastamos **analista vs operador**, las dos formas de DAR HERRAMIENTAS al LLM. "
-    "El zero-shot ya lo viste en paso_4. El contraste cuantitativo de los tres modos "
-    "(con AUC, coste, latencia, intervalos de confianza) llega en S3 paso_7."
-)
+if st.button("Comparar modos", disabled=not pregunta.strip()):
+    col_an, col_op = st.columns(2)
+
+    with col_an:
+        st.markdown("### 🧮 Modo analista (sólo df)")
+        with st.spinner("LLM (analista)…"):
+            raw_an, cost_an = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_ANALISTA)
+            track_cost(f"p6-an:{pregunta}", cost_an)
+            code_an = extract_code(raw_an)
+        with st.expander("Código generado"):
+            st.code(code_an, language="python")
+        res_an, err_an = run_code(code_an, df, "analista")
+        if err_an:
+            st.error(f"Error: {err_an}")
+        else:
+            if isinstance(res_an, (pd.DataFrame, pd.Series)):
+                st.dataframe(res_an, use_container_width=True)
+            else:
+                st.write(res_an)
+
+    with col_op:
+        st.markdown("### 🧠 Modo operador (df + modelos)")
+        with st.spinner("LLM (operador)…"):
+            raw_op, cost_op = ask_llm_for_code(client, pregunta, SYSTEM_PROMPT_OPERADOR)
+            track_cost(f"p6-op:{pregunta}", cost_op)
+            code_op = extract_code(raw_op)
+        with st.expander("Código generado"):
+            st.code(code_op, language="python")
+        res_op, err_op = run_code(code_op, df, "operador")
+        if err_op:
+            st.error(f"Error: {err_op}")
+        else:
+            if isinstance(res_op, (pd.DataFrame, pd.Series)):
+                st.dataframe(res_op, use_container_width=True)
+            else:
+                st.write(res_op)
 
 
 # ── Cierre: puente a S3 (el jueves) ────────────────────────

@@ -193,7 +193,22 @@ MODEL = "gpt-4.1-mini"
 #   Descripción: {description}"""
 # ──────────────────────────────────────────────────────────
 def build_scoring_prompt(description: str) -> str:
-    return _hueco(1, "construye el f-string del prompt (rol + tarea + formato)")
+    return """Eres un analista comercial B2B en Cañadata, una SaaS de
+   gestión de pipeline. Lee la descripción y estima la probabilidad
+   (0-100) de que esta empresa se convierta en cliente.
+   Devuelve SÓLO el número entero, sin explicación.
+
+   Descripción: {description}
+
+   More data:
+   columns are:
+   lead_id,company_name,industry,company_size,country,signup_date,source,demo_requested,emails_opened,response_time_hours,n_meetings,decision_maker_contacted,quoted_acv_eur,company_description,converted,converted_within_days,lead_segment_truth
+
+   and data for this lead is:
+
+   L0140,Verbena Works,fintech,24,DE,2025-11-29,Conf.,True,11,1.5,0,False,4114.95,"pequeña jugador de fintech en DE, ciclo de compra corto. 🚀💰",False,,fast_mover
+
+   """.format(description=description)
 
 
 # ── HUECO 2 ────────────────────────────────────────────────
@@ -220,7 +235,13 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
     Cached por (lead_id, description). _client opta fuera del hash.
     """
     prompt = build_scoring_prompt(description)
-    response = _hueco(2, "llamada `_client.chat.completions.create(...)` con max_tokens=10, temperature=0")
+    print(f"DEBUG: prompt para lead {lead_id}:\n{prompt}\n---")
+    response = response = _client.chat.completions.create(
+       model=MODEL,
+       messages=[{"role": "user", "content": prompt}],
+       max_tokens=10,
+       temperature=0.0,   # determinismo: mismo lead → mismo score
+   )
 
     text = response.choices[0].message.content.strip()
     cost_eur = (
@@ -233,7 +254,9 @@ def llm_score_lead(_client, lead_id: str, description: str) -> tuple[int, float]
     # el número entero. Si no encuentras nada, devuelve -1.
     # Pista: usa re.search(r"\d+", text) y .group(0).
     # ──────────────────────────────────────────────────────
-    score = _hueco(3, "parsea el primer número entero del texto con re.search")
+    print(f"DEBUG: respuesta LLM para lead {lead_id}: `{text}` (coste {cost_eur:.6f} €)")
+    m = re.search(r"\d+", text)
+    score = int(m.group(0)) if m else -1
     return score, cost_eur
 
 
