@@ -219,6 +219,7 @@ def extract_lead_from_text(text: str) -> dict:
         ' "quoted_acv_eur": <float>}.\n'
         "Si un campo no está en el texto, NO lo pongas. Sólo extrae lo explícito o muy implícito."
     )
+    print(f"LLM schema_prompt:\n{schema_prompt}\n\nLLM input text:\n{text}\n---")
     resp = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -228,6 +229,8 @@ def extract_lead_from_text(text: str) -> dict:
         response_format={"type": "json_object"},
         temperature=0.0,
     )
+    print("LLM response (JSON string):")
+    print(resp.choices[0].message.content)
     cost = (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
     track_cost(f"extract:{hash(text) % 10000}", cost)
     extracted = json.loads(resp.choices[0].message.content)
@@ -395,15 +398,16 @@ TOOL_FUNCS = {
     "extract_lead_from_text": extract_lead_from_text,  # ya activa
     # HUECO 1 · activa predict_conversion para que el bot sepa estimar P(convertir):
     # añade aquí una línea con la forma: "predict_conversion": predict_conversion,
-
+    "predict_conversion": predict_conversion,
     # HUECO 2 · activa predict_acv para que estime el valor del contrato:
     # añade aquí: "predict_acv": predict_acv,
-
+    "predict_acv": predict_acv,
     # HUECO 3 · activa get_archetype para que devuelva el arquetipo:
     # añade aquí: "get_archetype": get_archetype,
-
+    "get_archetype": get_archetype,
     # HUECO 4 · activa find_similar_leads para que busque parecidos en el histórico:
     # añade aquí: "find_similar_leads": find_similar_leads,
+    "find_similar_leads": find_similar_leads,
 }
 
 
