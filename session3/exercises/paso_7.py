@@ -203,17 +203,17 @@ st.caption(f"{len(df)} leads en el holdout · clasificador `{classifier['kind']}
 
 with st.expander("🧯 Warm-up: 5 conceptos en 10 minutos (ábrelo si vienes de S2 con dudas)", expanded=False):
     st.markdown("""
-**1. AUC vs accuracy.** Accuracy = "¿acerté esta predicción?" (pasa/falla por lead). AUC = "¿el modelo rankea mejor que aleatorio?" Mecánica: coges un par random (1 lead que convirtió, 1 que no). Si tu score para el positivo es más alto que el del negativo, ese par cuenta 1. AUC = promedio sobre todos los pares posibles. **0.5 = moneda; 1.0 = ranking perfecto; entre 0.5 y 1.0 = qué de bien rankeas, no qué de acertado.**
+**1. AUC frente a accuracy.** La accuracy responde "¿he acertado en esta predicción?", lead a lead. El AUC responde otra pregunta: "¿ordena el modelo mejor que el azar?". Mecánica: se toman dos leads cualesquiera, uno que convirtió y otro que no. Si la puntuación que el modelo asigna al que convirtió es más alta que la del que no convirtió, el par suma 1. El AUC es la media sobre todos los pares posibles del holdout. 0.5 equivale al azar (cara o cruz). 1.0 es ordenación perfecta. Los valores intermedios miden la **calidad del ranking, no el número de aciertos absolutos**.
 
-**2. Train / test / holdout.** En S1 partiste el dataset: train (entrenas), test (evalúas durante desarrollo, ya lo viste). Hoy estrenamos **holdout** = un tercer split que NADIE ha tocado. Es el único test honesto de generalización: si tu modelo lo aprueba aquí, no es porque haya memorizado.
+**2. Train / test / holdout.** En S1 dividiste el dataset en dos: train para ajustar el modelo y test para iterar durante el desarrollo. Hoy estrenamos el **holdout**: un tercer subconjunto que ningún modelo ha visto. Es el único test honesto de generalización. Si el modelo aprueba aquí, no es porque haya memorizado los datos de entrenamiento.
 
-**3. Bootstrap CI.** Con 20-100 leads, tu AUC podría ser suerte. Bootstrap: remuestreas 1000 veces los `n` leads con reemplazo (algunos repiten, otros no aparecen), calculas AUC en cada uno, y te quedas con el rango central 95% (percentiles 2.5 a 97.5). Eso es tu CI. **Si los CIs de dos modelos se solapan, no puedes decir que uno gana — la diferencia podría ser ruido.**
+**3. Bootstrap CI.** Con 20-100 leads, el AUC observado puede ser ruido muestral. Bootstrap te lo cuantifica: remuestreas los `n` leads con reemplazo 1000 veces (algunos se repiten, otros no aparecen en cada muestra), calculas el AUC en cada remuestreo y te quedas con el rango central del 95% (percentiles 2.5 y 97.5). Ese rango es tu intervalo de confianza. **Si los IC de dos modelos se solapan, no puedes afirmar que uno sea mejor**: la diferencia observada podría ser ruido.
 
-**4. Vectorización.** El clasificador procesa los 50 leads en UNA operación de matrices (~24 ms total para todos). El LLM procesa un lead por llamada HTTP (~650 ms cada uno). Por lead: clf 0.5 ms vs LLM 650 ms (~1300×). Por batch: clf 24 ms vs LLM 33 s (~1300× también, porque el batch del LLM es secuencial). Cuando ves "30× más lento", es una versión amable; la realidad por lead es mucho peor.
+**4. Vectorización.** El clasificador procesa los 50 leads en una sola operación matricial (~24 ms en total). El LLM procesa cada lead por separado, una llamada HTTP por cada uno (~650 ms por llamada). Por lead, la diferencia es de unos 1300× (0.5 ms del clasificador frente a 650 ms del LLM). Por batch completo es la misma proporción, porque las llamadas del LLM son secuenciales. Si en algún material lees "30× más lento", es una cifra optimista; la diferencia real por lead es notablemente mayor.
 
-**5. Unidades de coste.** En paso_7 lo verás en céntimos y en € por 1000 leads. En S2 viste `m€` = milésimas de euro (NO millones, lo decía la "m" minúscula). 1 m€ = 0.001 €. Para no confundir, hoy ponemos céntimos y euros directos.
+**5. Unidades de coste.** En paso_7 el coste se muestra en céntimos y en euros por cada 1000 leads. En S2 viste `m€`: milésimas de euro (la `m` minúscula no es mega ni millón). 1 m€ = 0.001 €. Hoy lo presentamos en céntimos y euros directos para evitar confusiones.
 
-**Si algo de esto no te cuadra, dilo en voz alta. No avances con el modelo mental flojo.**
+**Si alguno de estos conceptos no termina de quedar claro, decidlo en voz alta. No avancéis con el modelo mental sin afianzar.**
 """)
 
 n = st.slider("Número de leads a evaluar", min_value=5, max_value=len(df), value=20, step=5)

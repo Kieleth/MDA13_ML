@@ -14,11 +14,11 @@ S3 hereda los conceptos de S2 (los 3 modos LLM: zero-shot, analista, operador) s
 
 Si alguno te suena flojo, expande el bloque "🧯 Warm-up: 5 conceptos en 10 minutos" al inicio de `paso_7.py`. Resumen aquí también:
 
-- **AUC**: probabilidad de que un par random (positivo, negativo) tenga el positivo con score más alto. 0.5 aleatorio, 1.0 perfecto. NO es accuracy.
-- **Train / test / holdout**: train para fit, test para iterar, holdout para el examen final honesto. Hoy estrenamos el holdout.
-- **Bootstrap**: 1000 remuestreos con reemplazo te dan un intervalo de confianza. Si los CIs de dos modelos se solapan, no puedes afirmar quién gana.
-- **Vectorización**: el clasificador procesa los 50 leads en 1 operación de matrices (~24 ms). El LLM hace 1 llamada HTTP por lead (~650 ms × 50). Por eso la diferencia de latencia es brutal.
-- **Unidades**: hoy mostramos coste en céntimos y € directamente. Si ves `m€` en algún sitio (vino de S2), es "milésimas de euro", NO millones.
+- **AUC**: mide la calidad del ranking de un modelo. Tomas dos leads cualesquiera, uno que convirtió y otro que no. Si la puntuación del modelo para el que convirtió es más alta, el par suma 1. AUC es la media sobre todos los pares. 0.5 equivale al azar, 1.0 es ordenación perfecta. No es accuracy.
+- **Train / test / holdout**: train para ajustar el modelo, test para iterar durante el desarrollo, holdout es el examen final que ningún modelo ha visto. Hoy estrenamos el holdout.
+- **Bootstrap**: 1000 remuestreos con reemplazo de los `n` leads te dan un intervalo de confianza al 95%. Si los IC de dos modelos se solapan, no puedes afirmar cuál es mejor.
+- **Vectorización**: el clasificador procesa los 50 leads en una sola operación matricial (~24 ms). El LLM hace una llamada HTTP por lead (~650 ms cada una). Por lead la diferencia es de unos 1300×.
+- **Unidades**: hoy el coste se muestra en céntimos y en euros directos. Si ves `m€` en algún sitio (heredado de S2), son milésimas de euro, no millones.
 
 ## Antes de empezar (branch hygiene)
 
