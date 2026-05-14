@@ -6,11 +6,33 @@
 # Lo pegas en este chat. El asistente lo analiza llamando a
 # las herramientas que entrenaste en S1.
 #
-# La pieza nueva de S3: function calling tipado. El LLM ya no
-# escribe código (paso_5/6 de S2 con exec()), llama funciones
-# Python con un schema explícito. Es el patrón que ChatGPT con
-# plugins, Claude tools, y cualquier integración LLM seria usa
-# en producción.
+# ── La pieza nueva de S3: function calling tipado ─────────
+#
+# Ayer (S2 paso_5/6) el patrón era:
+#   1. LLM escribe código Python como string.
+#   2. Tú haces exec(code, namespace).
+#   3. Sale lo que sea (y a veces revienta).
+#
+# Hoy el patrón es DISTINTO:
+#   1. LLM produce un JSON tipado: {"tool": "predict_conversion",
+#      "args": {"lead": {...}}}.
+#   2. Tú llamas TU función Python con esos args y devuelves el
+#      resultado al LLM en otro JSON.
+#   3. El LLM compone la respuesta final al usuario.
+#
+# Diferencias prácticas frente a exec():
+#   - El LLM no ejecuta nada. Tú ejecutas. Auditable.
+#   - Los argumentos vienen validados contra un schema.
+#   - El proveedor (OpenAI, Anthropic, etc.) entrena al modelo
+#     específicamente para producir tool calls bien formados.
+#   - Cada call es observable: sabes qué herramienta se llamó,
+#     con qué args, cuándo, y cuánto costó.
+#
+# Es el patrón que usa ChatGPT con plugins, Claude con tools,
+# Cursor con su contexto, GitHub Copilot Chat. La sintaxis del
+# JSON varía un poco entre proveedores (lo que ves abajo es la
+# de OpenAI; Anthropic tiene otra forma); el patrón conceptual
+# es el mismo.
 #
 # El bot empieza casi mudo: sólo sabe extraer features del texto
 # libre. Tú le ENCIENDES capacidades una a una rellenando
@@ -178,6 +200,10 @@ def extract_lead_from_text(text: str) -> dict:
 
     Hace una llamada interna al LLM con JSON mode para forzar formato.
     Es una tool que internamente usa LLM (patrón muy común).
+
+    Devuelve el dict combinado (DEFAULTS + extracted) PERO también informa
+    qué campos vinieron del texto vs cuáles son defaults. El bot principal
+    debe usar esa info para calibrar su confianza.
     """
     schema_prompt = (
         "Extrae las features de este lead B2B en JSON con esta forma:\n"
@@ -205,8 +231,19 @@ def extract_lead_from_text(text: str) -> dict:
     cost = (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
     track_cost(f"extract:{hash(text) % 10000}", cost)
     extracted = json.loads(resp.choices[0].message.content)
-    # Completa con DEFAULTS lo que falte para que los modelos puedan correr
-    return {**DEFAULTS, **extracted}
+    lead = {**DEFAULTS, **extracted}
+    # Marcadores metadata para que el bot sepa qué confianza tiene:
+    # _extracted_from_text: campos que vinieron del usuario.
+    # _filled_with_defaults: campos que rellenamos por defecto.
+    # build_X() ignora estas keys porque no están en CLF_INPUT_COLS.
+    lead["_extracted_from_text"] = sorted(extracted.keys())
+    lead["_filled_with_defaults"] = sorted(k for k in DEFAULTS if k not in extracted)
+    lead["_confidence_hint"] = (
+        "alta" if len(extracted) >= 7 else
+        "media" if len(extracted) >= 4 else
+        "baja: la mayoría son defaults; comunícalo al usuario"
+    )
+    return lead
 
 
 def predict_conversion(lead: dict) -> dict:
@@ -361,26 +398,55 @@ TOOLS = [TOOL_SCHEMAS[name] for name in TOOL_FUNCS if name in TOOL_SCHEMAS]
 
 # ── SYSTEM_PROMPT del asistente ─────────────────────────────
 
-SYSTEM_PROMPT = (
-    "Eres un asistente comercial de Cañadata, una SaaS B2B. Tu trabajo es ayudar al comercial "
-    "a analizar leads nuevos.\n\n"
-    "Cuando el usuario te pase un lead (descripción libre), sigue este flujo SECUENCIAL:\n"
-    "1. Llama `extract_lead_from_text` con el texto completo del usuario. Espera el resultado.\n"
-    "2. Llama `predict_conversion` con el dict de features que devolvió extract.\n"
-    "3. Llama `predict_acv` con el mismo dict.\n"
-    "4. Llama `get_archetype` con el mismo dict.\n"
-    "5. Llama `find_similar_leads` con el dict + k=3.\n"
-    "6. Resume en bullets con: P(convertir), ACV, arquetipo, 3 leads parecidos y sus desenlaces, "
-    "   y UNA recomendación accionable ('llamar mañana', 'marca como tire_kicker', etc.).\n\n"
-    "Reglas:\n"
-    "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar. NUNCA llames con lead={}.\n"
-    "- Si alguna tool no está disponible (no aparece en tu lista), continúa con las que tienes y "
-    "  explica al usuario qué falta para análisis completo.\n"
-    "- Si la descripción es pobre, ÚSALA igualmente: extract rellena defaults razonables y los modelos "
-    "  pueden trabajar con eso. NO pidas confirmación al usuario, da tu mejor estimación marcando que "
-    "  la confianza es baja.\n\n"
-    "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
-)
+def _build_system_prompt() -> str:
+    """System prompt dinámico: lista sólo las tools que están activas en TOOL_FUNCS.
+
+    Sin esto, el bot intenta llamar tools que están en su 'cabeza' (porque las viste
+    enumeradas en el prompt) pero no en su lista real de TOOLS. Con system_prompt
+    dinámico, el bot sólo conoce lo que efectivamente puede llamar.
+    """
+    active_tools = list(TOOL_FUNCS.keys())
+    flow_lines = []
+    step = 1
+    if "extract_lead_from_text" in active_tools:
+        flow_lines.append(f"{step}. Llama `extract_lead_from_text` con el texto del usuario.")
+        step += 1
+    if "predict_conversion" in active_tools:
+        flow_lines.append(f"{step}. Llama `predict_conversion` con el dict de features que devolvió extract.")
+        step += 1
+    if "predict_acv" in active_tools:
+        flow_lines.append(f"{step}. Llama `predict_acv` con el mismo dict.")
+        step += 1
+    if "get_archetype" in active_tools:
+        flow_lines.append(f"{step}. Llama `get_archetype` con el mismo dict.")
+        step += 1
+    if "find_similar_leads" in active_tools:
+        flow_lines.append(f"{step}. Llama `find_similar_leads` con el dict + k=3.")
+        step += 1
+    flow_lines.append(f"{step}. Resume en bullets con lo que tengas: probabilidad si predict_conversion estaba activa, ACV si predict_acv, arquetipo si get_archetype, leads parecidos si find_similar_leads, y UNA recomendación accionable.")
+
+    flow = "\n".join(flow_lines)
+
+    return (
+        "Eres un asistente comercial de Cañadata, una SaaS B2B. Tu trabajo es ayudar al comercial "
+        "a analizar leads nuevos.\n\n"
+        f"Tools que tienes activas AHORA MISMO: {', '.join(active_tools)}.\n\n"
+        "Cuando el usuario te pase un lead (descripción libre), sigue este flujo SECUENCIAL:\n"
+        f"{flow}\n\n"
+        "Reglas:\n"
+        "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar.\n"
+        "- Si te falta alguna tool (no aparece en la lista de arriba), continúa con las que tienes y "
+        "  dile al usuario qué tool falta activar (HUECO N en paso_7.py).\n"
+        "- Cuando extract_lead_from_text devuelva un dict con campos como `_confidence_hint='baja'` o "
+        "  `_filled_with_defaults` largo, **menciónalo explícitamente al usuario** ('he tenido que rellenar "
+        "  X campos con defaults; la confianza de las predicciones es limitada').\n"
+        "- Si la descripción es pobre, ÚSALA igualmente. NO pidas confirmación al usuario, da tu mejor estimación.\n\n"
+        "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
+    )
+
+
+# Construido en cada llamada para reflejar el estado actual de TOOL_FUNCS.
+SYSTEM_PROMPT = _build_system_prompt()
 
 
 # ── Loop de tool calling ────────────────────────────────────

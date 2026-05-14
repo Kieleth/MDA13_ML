@@ -4,7 +4,7 @@
 2. Click **"+ Create"**.
 3. En el panel **"Configure"** (no en "Create" del chat conversacional):
    - **Name**: "Cañadata Lead Advisor".
-   - **Description**: "Asesor de leads B2B B2B de Cañadata".
+   - **Description**: "Asesor de leads B2B de Cañadata".
    - **Instructions**: pega ENTERO el contenido de `canadata_lead_advisor.md`.
    - **Capabilities**: desactiva "Web Browsing", "DALL·E", "Code Interpreter" (no los necesitas).
 4. **Save** → "Only me" si todavía es prueba, o "Anyone with the link" / "Public" para compartir.

@@ -14,6 +14,8 @@ Tres señales, en orden de importancia:
 
 Si dos de las tres se dan, reentrena. Si las tres, reentrena ya.
 
+> **Aviso intelectual honesto**: estos tres umbrales (20%, 3 meses, "más de lo esperado") son **reglas de pulgar de la industria, no leyes**. No hay un paper que demuestre que son óptimas. Vienen de la experiencia operativa de equipos de ML. Si tu negocio cambia muy rápido (mercados emergentes, productos en pivote constante), baja a 1-2 meses. Si tu negocio es muy estable (B2B en sector regulado), sube a 6 meses. Calibra a tu realidad.
+
 ---
 
 ## El flujo completo
@@ -53,7 +55,9 @@ Si dos de las tres se dan, reentrena. Si las tres, reentrena ya.
 ### Clusterer: ARI (Adjusted Rand Index)
 
 - **Qué mide**: el acuerdo entre los clusters que predice el modelo y los arquetipos plantados (`quick_mover`, `strategic`, `tire_kicker` que vienen del generador). 0 = aleatorio, 1 = acuerdo perfecto.
-- **Cuándo aplica**: sólo tiene sentido porque tenemos ground truth (los arquetipos). En tu caso real, si NO tienes arquetipos etiquetados, métricas alternativas: silhouette score, Davies-Bouldin, o estabilidad entre re-runs.
+- **Cuándo aplica**: sólo tiene sentido si tenemos ground truth (los arquetipos). El dataset de Cañadata trae `lead_segment_truth` porque es sintético; **en tu caso real no la vas a tener**.
+- **Alternativa para tu caso real (recomendada)**: usa **silhouette score** (`sklearn.metrics.silhouette_score`). Mide qué tan bien separados están los clusters entre sí, sin necesidad de ground truth. Rango -1 a 1. **Apunta a > 0.3 como "razonable"** para k-means sobre features escaladas. < 0.2 significa que los clusters se solapan tanto que probablemente no estás capturando estructura real.
+- Hay otras (Davies-Bouldin, estabilidad entre re-runs) pero silhouette es la regla de pulgar más usada y la que te recomiendo aprender primero.
 - **En Cañadata**: ronda **0.40-0.50**. Lower bound aceptable porque KMeans sobre features estructuradas no clava arquetipos de comportamiento al 100%.
 - **Gate**: nuevo ≥ 0.95 × actual.
 
@@ -68,12 +72,16 @@ Si dos de las tres se dan, reentrena. Si las tres, reentrena ya.
 
 ## La regla del 95% (con dirección, sin trampas)
 
-Las cuatro métricas comparan modelo nuevo vs modelo actual:
+Las cuatro métricas comparan modelo nuevo vs modelo actual. La dirección cambia según si la métrica es "más alto mejor" o "más bajo mejor":
 
-- **Higher-is-better** (AUC, R², ARI): nuevo ≥ 0.95 × actual.
-- **Lower-is-better** (MAPE): nuevo ≤ 1.05 × actual.
+| Métrica | Dirección | Comparador | Si actual=X, nuevo debe ser… |
+|---|---|---|---|
+| AUC | higher is better | nuevo ≥ 0.95 × actual | actual=0.90 → nuevo ≥ 0.855 |
+| R² | higher is better | nuevo ≥ 0.95 × actual | actual=0.70 → nuevo ≥ 0.665 |
+| ARI | higher is better | nuevo ≥ 0.95 × actual | actual=0.45 → nuevo ≥ 0.428 |
+| MAPE | lower is better | nuevo ≤ 1.05 × actual | actual=85 → nuevo ≤ 89.25 |
 
-Las dos reglas dicen lo mismo en lenguaje normal: **no degrades más de un 5%**. Tolera ruido pequeño (los modelos varían algo entre seeds) pero rechaza un modelo claramente peor.
+Las cuatro filas dicen lo mismo en lenguaje normal: **no degrades más de un 5%**. Tolera ruido pequeño (los modelos varían algo entre seeds) pero rechaza un modelo claramente peor. El cambio de operador (≥ vs ≤) y de coeficiente (0.95 vs 1.05) según la métrica es la trampa clásica al implementarlo en código.
 
 ### Por qué 95% y no 90 o 100
 
@@ -96,6 +104,30 @@ No es el fin del mundo. Significa que el modelo nuevo no es lo bastante bueno. P
 5. **Considera no reentrenar**: si tu modelo actual sigue dando buenos resultados en producción, quizá no necesitas el nuevo. "No deploy" también es una decisión válida.
 
 ---
+
+## Cómo comparar tus métricas reales contra los rangos de arriba
+
+Las cifras (AUC 0.85-0.92, R² 0.65-0.75, etc.) son las del modelo entrenado en S1. Para ver las tuyas:
+
+1. Abre `pre_class/1_classical_models.ipynb`.
+2. Busca las celdas finales que imprimen métricas de cada modelo sobre validation/holdout (suelen tener `print(f"AUC: ...")` o un `.score(...)` al final de la celda de entrenamiento).
+3. Anota tus números reales: AUC=?, R²=?, ARI=?, MAPE=?.
+4. Compáralos con los rangos. Si están dentro, vas bien. Si están muy por debajo, hay probablemente un bug en feature engineering o en el split.
+
+Cuando reentrenes, repite este ejercicio sobre el nuevo holdout y aplica la regla del 95% celda a celda.
+
+## ⚠ Antes de cambiar a la rama session-3-advanced
+
+Si tienes paso_7 con huecos rellenos y `.env` con TAVILY/SLACK keys, **commitea o stashea antes** de `git checkout session-3-advanced`. Sin eso, te llevas los cambios contigo y al volver a `session-3` no sabrás qué pertenece a dónde.
+
+```sh
+git status            # ¿hay rojo?
+git stash push -m "s3 huecos llenos"
+git checkout session-3-advanced
+# ...explora...
+git checkout session-3
+git stash pop         # recupera tu trabajo
+```
 
 ## Hacerlo automático
 

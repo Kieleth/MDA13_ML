@@ -6,6 +6,16 @@ S1 entrenaste 4 modelos. S2 le diste herramientas al LLM. Hoy tres cosas:
 2. **paso_8**: el mismo asistente, empaquetado como un *skill* que puedes pegar en Claude Project o ChatGPT. **Sin terminal**, sin Python. Para compartir con tu equipo.
 3. **paso_9**: una guía sobre qué hacer cuando dentro de 3 meses tengas leads nuevos y quieras reentrenar.
 
+## Lo que hoy NO hacemos (la trade-off honesta)
+
+S3 v2 cambia el foco respecto a la versión anterior. **Hoy aprendes a operar y a compartir, no a medir formalmente**. Eso significa:
+
+- No calculas ROC-AUC con intervalos de confianza por bootstrap.
+- No comparas modelo nuevo vs viejo con quality gates automáticos.
+- No construyes el pipeline CI/CD que reentrene + valide + despliegue.
+
+Todo eso está en la rama `session-3-advanced` (paso_7/8/9 originales con `retrain.py`, bootstrap CI, ship-it pipeline). Si tu rol requiere medir con rigor, ése es el siguiente paso. Hoy te llevas el patrón de **construir un asistente con tools, empaquetarlo, y saber CUÁNDO toca reentrenar**. Las métricas son lectura (paso_9), no práctica.
+
 ---
 
 ## paso_7 · El dashboard con tools
@@ -73,12 +83,25 @@ ls session3/
 
 ---
 
+## La sincronía entre paso_7 y paso_8 (gotcha importante)
+
+Los tres entregables son **complementarios, no alternativos**:
+
+- **paso_7** (dashboard local) usa los `.pkl` entrenados. Si reentrenas (paso_9), `paso_7` mejora automáticamente al cargar los `.pkl` nuevos.
+- **paso_8** (skill `.md`) **NO usa los `.pkl`**. Vive del prompt + heurísticas que escribiste a mano. Si reentrenas y el modelo aprende algo nuevo, el skill NO se entera.
+- **Consecuencia**: cada vez que reentrenas y los hallazgos del modelo cambian (p.ej. ahora una nueva industria convierte mejor), tienes que **actualizar el skill `.md` a mano** y volver a pegarlo en Claude Project / Custom GPT. **Hay drift entre los dos**.
+
+Si tu equipo va a usar el skill seriamente, marca en el calendario revisar el `.md` cada vez que retrainees. No es automatizable sin servidor.
+
 ## El veredicto (cierre de S3)
 
-Una frase, por escrito:
+Una frase, por escrito. La pregunta NO es "¿cuál de los tres?" porque son complementarios. La pregunta es:
 
-> "Para mi caso real, ¿uso paso_7 (dashboard local con modelos), paso_8 (skill compartible LLM-only), o paso_9 (retrain manual cada N meses)? ¿Por qué?".
+> "El lunes, ¿qué combinación de paso_7 + paso_8 + paso_9 usaría en mi empresa, y cuál es la primera pieza que monto?"
 
-No hay respuesta correcta. Hay decisión articulada. Eso es lo que te llevas del taller.
+Variaciones aceptables:
+- "Empiezo por paso_7 para mí, paso_8 para el equipo cuando paso_7 estabilice, paso_9 al trimestre."
+- "Salto paso_7 porque ya tengo modelos productivizados, voy directo a paso_8 para mi equipo no-técnico."
+- "Hoy solo paso_8: no tengo modelos entrenados, sólo prompt + heurísticas."
 
-La plantilla con preguntas guiadas está en [`decision_framework.md`](decision_framework.md) (mismo directorio).
+No hay respuesta correcta. Hay decisión articulada. La plantilla con preguntas guiadas está en [`decision_framework.md`](decision_framework.md).

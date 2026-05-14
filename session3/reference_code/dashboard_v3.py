@@ -195,8 +195,15 @@ def extract_lead_from_text(text: str) -> dict:
     cost = (resp.usage.prompt_tokens * COST_IN + resp.usage.completion_tokens * COST_OUT) * USD_TO_EUR
     track_cost(f"extract:{hash(text) % 10000}", cost)
     extracted = json.loads(resp.choices[0].message.content)
-    # Completa con DEFAULTS lo que falte para que los modelos puedan correr
-    return {**DEFAULTS, **extracted}
+    lead = {**DEFAULTS, **extracted}
+    lead["_extracted_from_text"] = sorted(extracted.keys())
+    lead["_filled_with_defaults"] = sorted(k for k in DEFAULTS if k not in extracted)
+    lead["_confidence_hint"] = (
+        "alta" if len(extracted) >= 7 else
+        "media" if len(extracted) >= 4 else
+        "baja: la mayoría son defaults; comunícalo al usuario"
+    )
+    return lead
 
 
 def predict_conversion(lead: dict) -> dict:
@@ -382,6 +389,7 @@ TOOLS = [TOOL_SCHEMAS[name] for name in TOOL_FUNCS if name in TOOL_SCHEMAS]
 SYSTEM_PROMPT = (
     "Eres un asistente comercial de Cañadata, una SaaS B2B. Tu trabajo es ayudar al comercial "
     "a analizar leads nuevos.\n\n"
+    f"Tools activas: {', '.join(TOOL_FUNCS.keys())}.\n\n"
     "Cuando el usuario te pase un lead (descripción libre), sigue este flujo SECUENCIAL:\n"
     "1. Llama `extract_lead_from_text` con el texto completo del usuario. Espera el resultado.\n"
     "2. Llama `predict_conversion` con el dict de features que devolvió extract.\n"
@@ -392,6 +400,8 @@ SYSTEM_PROMPT = (
     "   y UNA recomendación accionable.\n\n"
     "Reglas:\n"
     "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar.\n"
+    "- Cuando extract devuelva un dict con `_confidence_hint='baja'` o `_filled_with_defaults` largo, "
+    "  menciónaselo al usuario.\n"
     "- Si la descripción es pobre, USA igualmente los defaults que devuelve extract. NO pidas confirmación.\n"
     "- Sólo llama `draft_outreach_email` si el usuario lo pide explícitamente.\n\n"
     "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
