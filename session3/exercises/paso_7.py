@@ -467,6 +467,9 @@ def _build_system_prompt() -> str:
         "  con defaults; la confianza de las predicciones es limitada').\n"
         "- Si la descripción es pobre, ÚSALA igualmente. NO pidas confirmación al usuario, da tu mejor estimación.\n\n"
         "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
+        "Y justifica cada recomendación basándote en las predicciones y datos que tienes (no des recomendaciones sin más sin explicar el porqué)."
+        "Deja una traza clara de tu razonamiento para que el comercial aprenda a confiar en ti con el tiempo."
+        "Si haces qualquier tipo de operacion matemática o lógica, muestra el resultado y cómo lo has calculado (por ejemplo, si dices 'este lead es un quick_mover', explica 'porque pertenece al cluster 2 que es mayoritariamente quick_mover')."
     )
 
 
