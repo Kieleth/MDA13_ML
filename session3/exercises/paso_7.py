@@ -246,22 +246,36 @@ def extract_lead_from_text(text: str) -> dict:
     return lead
 
 
-def predict_conversion(lead: dict) -> dict:
+def _coerce_lead(lead, kwargs):
+    """El LLM a veces aplana el dict como kwargs sueltos en vez de pasarlo como lead={...}.
+    Aceptamos ambas formas para que la tool no falle por esa confusión.
+    """
+    if lead is None:
+        return kwargs
+    if kwargs:
+        return {**lead, **kwargs}
+    return lead
+
+
+def predict_conversion(lead: dict = None, **kwargs) -> dict:
     """P(convertir) del clasificador entrenado."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, CLF_INPUT_COLS, classifier["feature_names"])
     proba = float(classifier["model"].predict_proba(X)[0, 1])
     return {"probability": round(proba, 3), "interpretation": f"{int(proba*100)}% de probabilidad de firmar"}
 
 
-def predict_acv(lead: dict) -> dict:
+def predict_acv(lead: dict = None, **kwargs) -> dict:
     """ACV estimado en euros del regresor."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, REG_INPUT_COLS, regressor["feature_names"])
     acv = float(np.exp(regressor["model"].predict(X))[0])
     return {"acv_eur": round(acv, 0), "interpretation": f"{int(acv):,} € estimados de contrato anual"}
 
 
-def get_archetype(lead: dict) -> dict:
+def get_archetype(lead: dict = None, **kwargs) -> dict:
     """Arquetipo del clusterer entrenado."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
     Xs = clusterer["scaler"].transform(X)
     cluster_id = int(clusterer["model"].predict(Xs)[0])
@@ -269,8 +283,9 @@ def get_archetype(lead: dict) -> dict:
     return {"cluster_id": cluster_id, "archetype": archetype}
 
 
-def find_similar_leads(lead: dict, k: int = 3) -> dict:
+def find_similar_leads(lead: dict = None, k: int = 3, **kwargs) -> dict:
     """Top-k leads históricos más parecidos por distancia euclídea sobre features escaladas."""
+    lead = _coerce_lead(lead, kwargs)
     X_new = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
     Xs_new = clusterer["scaler"].transform(X_new)[0]
     # Build matrix for all historical leads
@@ -434,12 +449,18 @@ def _build_system_prompt() -> str:
         "Cuando el usuario te pase un lead (descripción libre), sigue este flujo SECUENCIAL:\n"
         f"{flow}\n\n"
         "Reglas:\n"
-        "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar.\n"
+        "- **CRÍTICO**: las tools `predict_conversion`, `predict_acv`, `get_archetype`, `find_similar_leads` "
+        "  reciben UN ÚNICO parámetro llamado `lead` que es un objeto. NO desempaquetes los campos.\n"
+        "    ❌ MAL: predict_conversion(industry='SaaS', company_size=350, ...)\n"
+        "    ✅ BIEN: predict_conversion(lead={'industry': 'SaaS', 'company_size': 350, ...})\n"
+        "  El objeto `lead` que pasas es EL MISMO dict que te devolvió extract_lead_from_text (puedes "
+        "  pasárselo entero, los campos `_extracted_from_text`/`_filled_with_defaults`/`_confidence_hint` "
+        "  los ignoran las tools).\n"
         "- Si te falta alguna tool (no aparece en la lista de arriba), continúa con las que tienes y "
         "  dile al usuario qué tool falta activar (HUECO N en paso_7.py).\n"
-        "- Cuando extract_lead_from_text devuelva un dict con campos como `_confidence_hint='baja'` o "
-        "  `_filled_with_defaults` largo, **menciónalo explícitamente al usuario** ('he tenido que rellenar "
-        "  X campos con defaults; la confianza de las predicciones es limitada').\n"
+        "- Cuando extract_lead_from_text devuelva un dict con `_confidence_hint='baja'` o "
+        "  `_filled_with_defaults` largo, **menciónalo al usuario** ('he tenido que rellenar X campos "
+        "  con defaults; la confianza de las predicciones es limitada').\n"
         "- Si la descripción es pobre, ÚSALA igualmente. NO pidas confirmación al usuario, da tu mejor estimación.\n\n"
         "Sé conciso. Bullets, no párrafos largos. Peninsular profesional, sin marketing."
     )

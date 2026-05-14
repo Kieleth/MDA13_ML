@@ -206,22 +206,34 @@ def extract_lead_from_text(text: str) -> dict:
     return lead
 
 
-def predict_conversion(lead: dict) -> dict:
+def _coerce_lead(lead, kwargs):
+    """El LLM a veces aplana el dict como kwargs sueltos. Aceptamos ambas formas."""
+    if lead is None:
+        return kwargs
+    if kwargs:
+        return {**lead, **kwargs}
+    return lead
+
+
+def predict_conversion(lead: dict = None, **kwargs) -> dict:
     """P(convertir) del clasificador entrenado."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, CLF_INPUT_COLS, classifier["feature_names"])
     proba = float(classifier["model"].predict_proba(X)[0, 1])
     return {"probability": round(proba, 3), "interpretation": f"{int(proba*100)}% de probabilidad de firmar"}
 
 
-def predict_acv(lead: dict) -> dict:
+def predict_acv(lead: dict = None, **kwargs) -> dict:
     """ACV estimado en euros del regresor."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, REG_INPUT_COLS, regressor["feature_names"])
     acv = float(np.exp(regressor["model"].predict(X))[0])
     return {"acv_eur": round(acv, 0), "interpretation": f"{int(acv):,} € estimados de contrato anual"}
 
 
-def get_archetype(lead: dict) -> dict:
+def get_archetype(lead: dict = None, **kwargs) -> dict:
     """Arquetipo del clusterer entrenado."""
+    lead = _coerce_lead(lead, kwargs)
     X = build_X(lead, REG_INPUT_COLS, clusterer["feature_names"])
     Xs = clusterer["scaler"].transform(X)
     cluster_id = int(clusterer["model"].predict(Xs)[0])
@@ -229,8 +241,9 @@ def get_archetype(lead: dict) -> dict:
     return {"cluster_id": cluster_id, "archetype": archetype}
 
 
-def draft_outreach_email(lead: dict, tone: str = "profesional") -> dict:
+def draft_outreach_email(lead: dict = None, tone: str = "profesional", **kwargs) -> dict:
     """Redacta un email corto de outreach para el lead. Tool bonus de dashboard_v3."""
+    lead = _coerce_lead(lead, kwargs)
     resp = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -399,7 +412,10 @@ SYSTEM_PROMPT = (
     "6. Resume en bullets con: P(convertir), ACV, arquetipo, 3 leads parecidos y sus desenlaces, "
     "   y UNA recomendación accionable.\n\n"
     "Reglas:\n"
-    "- SIEMPRE pasa el dict completo de features (lead=...) a las tools de predict/archetype/similar.\n"
+    "- **CRÍTICO**: las tools predict_*/get_archetype/find_similar_leads/draft_outreach_email reciben UN "
+    "  ÚNICO parámetro `lead` (objeto). NO desempaquetes los campos.\n"
+    "    ❌ MAL: predict_conversion(industry='SaaS', company_size=350, ...)\n"
+    "    ✅ BIEN: predict_conversion(lead={'industry': 'SaaS', 'company_size': 350, ...})\n"
     "- Cuando extract devuelva un dict con `_confidence_hint='baja'` o `_filled_with_defaults` largo, "
     "  menciónaselo al usuario.\n"
     "- Si la descripción es pobre, USA igualmente los defaults que devuelve extract. NO pidas confirmación.\n"
