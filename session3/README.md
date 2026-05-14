@@ -1,4 +1,4 @@
-# Sesión 3 — Medir, validar, desplegar
+# Sesión 3 · Medir, validar, desplegar
 
 S1 entrenaste herramientas. S2 las pusiste detrás de un LLM. Hoy mides si todo eso justifica su coste, montas puertas de calidad, y construyes el flujo entero del lunes ("entran 150 leads nuevos, ¿cómo redesplegamos?").
 
@@ -35,9 +35,9 @@ Los archivos `.pkl` de S1 (`session1/models/*.pkl`) están en `.gitignore`. **Pe
 
 ## Orden
 
-1. `exercises/paso_7.py` — **Comparison harness** sobre 100 leads del holdout. Clasificador clásico vs LLM zero-shot, con AUC, bootstrap CI, coste y latencia. **TOGETHER**: Luis tipea contigo.
-2. `exercises/paso_8.py` — **Quality gates** alrededor de `retrain.py`. Dry-run, gates relativos al modelo en producción, deploy real tras confirmación. **SUPPORTED**: huecos más grandes, Luis apoya.
-3. `exercises/paso_9.py` — **Ship-it pipeline**. Upload CSV → retrain → gates → deploy → reload del dashboard. **INDEPENDENT**: lo escribes tú, Luis mira de lejos.
+1. `exercises/paso_7.py` · **Comparison harness** sobre 100 leads del holdout. Clasificador clásico vs LLM zero-shot, con AUC, bootstrap CI, coste y latencia. **TOGETHER**: Luis tipea contigo.
+2. `exercises/paso_8.py` · **Quality gates** alrededor de `retrain.py`. Dry-run, gates relativos al modelo en producción, deploy real tras confirmación. **SUPPORTED**: huecos más grandes, Luis apoya.
+3. `exercises/paso_9.py` · **Ship-it pipeline**. Upload CSV → retrain → gates → deploy → reload del dashboard. **INDEPENDENT**: lo escribes tú, Luis mira de lejos.
 
 Cada `.py` se lanza con:
 
@@ -62,8 +62,8 @@ streamlit run session3/exercises/paso_N.py
 Sobre 100 leads del holdout (que ningún modelo ha visto):
 - **ROC-AUC** del clasificador clásico vs LLM zero-shot. AUC = probabilidad de que un par random (positivo, negativo) tenga el positivo con score más alto. 0.5 = aleatorio, 1.0 = perfecto.
 - **Bootstrap CI 95%** (1000 remuestreos con reemplazo). Si los intervalos se solapan, NO puedes decir que un modelo gana. Es bootstrap independiente, no pareado (lo más correcto en producción sería pareado o DeLong test).
-- **Coste** total y por predicción, en m€ (milésimas de euro: 1000 m€ = 1 €).
-- **Latencia** media. El LLM es ~30× más lento POR LEAD que el clasificador (que vectoriza), y ~1300× si comparas latencia/lead vs clf vectorizado para los 50.
+- **Coste** total y por predicción, en céntimos y € directos. Para 1000 leads, ~3 céntimos (0.03 €).
+- **Latencia** media. ~650 ms por lead con el LLM, frente a ~24 ms para los 50 leads del clasificador (vectorizado). Por lead son ~1300× de diferencia.
 - **Expected Value** dado un threshold y la economía del negocio (`gain_per_signing`, `cost_per_call`). El AUC mide saber, el EV mide cobrar.
 
 Las columnas `converted` y `lead_segment_truth` del holdout vienen plantadas en pre-class (`pre_class/1_classical_models.ipynb`); son la **ground truth** contra la que se evalúan los modelos.
@@ -99,7 +99,7 @@ Si no tienes un caso real en mente, usa el de Cañadata: 700 leads/mes con scori
 
 ## Referencia
 
-`reference_code/dashboard_v3.py` — el dashboard integrado con los 3 modos LLM + harness de comparación + ship-it pipeline. Lo lanza el profesor al final como reveal. Mira aquí si te bloqueas, pero después de intentar tú.
+`reference_code/dashboard_v3.py` · el dashboard integrado con los 3 modos LLM + harness de comparación + ship-it pipeline. Lo lanza el profesor al final como reveal. Mira aquí si te bloqueas, pero después de intentar tú.
 
 ## Para ver el deploy en vivo (paso_8 / paso_9)
 
